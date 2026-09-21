@@ -7,6 +7,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的标签（如 v0.1.0）。留空则只构建、不发布，用于验证流水线本身。"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -103,6 +108,9 @@ jobs:
     name: 发布 Release
     needs: build
     runs-on: ubuntu-latest
+    # 没有 tag 就没法建 Release（action 会直接报 "GitHub Releases requires a tag"）。
+    # 不带 tag 的手动触发只用来验证六个平台能否正常构建打包，这里直接跳过发布。
+    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
     steps:
       - uses: actions/checkout@v7
 
@@ -121,6 +129,7 @@ jobs:
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             downloaded/*.tar.gz
             downloaded/*.zip

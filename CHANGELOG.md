@@ -4,6 +4,30 @@
 
 ## [Unreleased]
 
+### 依赖
+
+- 升级 GitHub Actions：`checkout` 4→7、`upload-artifact` 4→7、`download-artifact` 4→8、
+  `configure-pages` 5→6、`deploy-pages` 4→5。已通过实际运行验证：六个平台的构建、
+  artifact 上传下载、`merge-multiple`、SHA256SUMS 汇总、Pages 部署均正常
+- 升级 `vite` 6→8、`@vitejs/plugin-react` 4→6、`lucide-react` 0.468→1。
+  这三者必须一起升：前两者互为 peer 依赖，单升任一个 `npm ci` 都会 ERESOLVE 失败
+
+### 修复
+
+- `vite.config.js` 的 `manualChunks` 改为函数形式。Vite 8 底层换成 rolldown，
+  不再接受对象形式，否则构建直接抛 `manualChunks is not a function`
+- 用内联的 Octicon `mark-github` 替换 `lucide-react` 的 `Github` 图标。
+  lucide v1 移除了全部品牌 logo，没有内置替代
+- `release.yml`：不带 tag 的手动触发不再让发布步骤报错。
+  之前 `workflow_dispatch` 会一路跑到 `GitHub Releases requires a tag` 才失败，
+  现在无 tag 时只构建验证、跳过发布，也支持通过输入指定要发布的 tag
+
+### 其它
+
+- 站点已上线：<https://junhey.github.io/commands/>，
+  一键安装地址 <https://junhey.github.io/commands/install.sh> 可直接使用
+- 构建耗时 3.5s → 0.9s（rolldown）
+
 ## [0.1.0] - 2026-09-21
 
 首个版本。由原先分开的两个原型（Rust 交互式 shell 与 React 演示站点）合并为一个产品：
