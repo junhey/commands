@@ -1,0 +1,62 @@
+name: Bug 反馈
+description: 报告一个不符合预期的行为
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量提供可复现的最小步骤，这对定位问题帮助最大。
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: "`cmds --version` 的输出"
+      placeholder: cmds 0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及范围
+      options:
+        - CLI（交互式 shell / 提示符 / 补全）
+        - 官网或 Playground
+        - 安装脚本
+        - 其它
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 系统与终端
+      placeholder: macOS 15.3 / iTerm2 3.5，或 Windows 11 / Windows Terminal
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 运行 cmds
+        2. 输入 ...
+        3. 按 Tab
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为与实际行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 配置文件（可选）
+      description: "`cmds config show` 的输出，请去掉其中的敏感信息"
+      render: toml

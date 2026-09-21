@@ -1,0 +1,25 @@
+[package]
+name = "cmds"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "Commands (cmds) — 轻量高效的交互式终端：fish 风格历史建议 + Tab 候选菜单 + starship 风格提示符"
+readme = "../README.md"
+keywords = ["shell", "prompt", "terminal", "completion", "history"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "cmds"
+path = "src/main.rs"
+
+[dependencies]
+crossterm = "0.29.0"
+unicode-width = "0.2.2"
+
+[target."cfg(unix)".dependencies]
+libc = "0.2.189"

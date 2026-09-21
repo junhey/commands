@@ -1,0 +1,19 @@
+[workspace]
+members = ["cli"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Commands Contributors"]
+license = "ISC"
+repository = "https://github.com/junhey/commands"
+homepage = "https://junhey.github.io/commands/"
+documentation = "https://junhey.github.io/commands/#guide"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

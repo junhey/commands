@@ -1,0 +1,71 @@
+name: Deploy site
+
+# 把 web/ 构建出的静态站点发布到 GitHub Pages。
+# 站点根目录同时提供 install.sh / install.ps1，所以
+# `curl -fsSL https://junhey.github.io/commands/install.sh | sh` 可以直接用。
+#
+# 注意：私有仓库启用 Pages 需要 GitHub Pro 或组织套餐。
+# 仓库是私有且没有相应套餐时，这个工作流会在部署一步失败，
+# 不影响 CI 与 Release；改为公开仓库后即可正常发布。
+on:
+  push:
+    branches: [master]
+    paths:
+      - "web/**"
+      - "install/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 安装依赖
+        working-directory: web
+        run: npm ci
+
+      - name: 构建站点
+        working-directory: web
+        env:
+          # Pages 部署在 /<repo>/ 子路径下
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: 确认安装脚本在站点根目录
+        working-directory: web
+        run: |
+          test -f dist/install.sh
+          test -f dist/install.ps1
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
