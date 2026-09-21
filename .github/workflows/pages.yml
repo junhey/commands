@@ -32,7 +32,7 @@ jobs:
     # 仓库改为公开后会自动开始部署（还需在 Settings → Pages 把 Source 选为 GitHub Actions）。
     if: github.event.repository.visibility == 'public'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
