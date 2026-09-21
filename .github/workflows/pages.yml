@@ -28,6 +28,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 免费账户下私有仓库无法启用 Pages，这里直接跳过而不是每次推送都报红。
+    # 仓库改为公开后会自动开始部署（还需在 Settings → Pages 把 Source 选为 GitHub Actions）。
+    if: github.event.repository.visibility == 'public'
     steps:
       - uses: actions/checkout@v4
 
