@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cli:
+    name: CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 检查格式
+        run: cargo fmt --all --check
+
+      - name: Clippy（警告视为错误）
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: 单元测试
+        run: cargo test --locked
+
+      # 测试里有依赖进程当前目录的路径补全，重跑一次确认没有并行污染
+      - name: 单元测试（单线程复跑）
+        run: cargo test --locked -- --test-threads=1
+
+      - name: Release 构建
+        run: cargo build --release --locked
+
+      - name: 冒烟测试（Unix）
+        if: runner.os != 'Windows'
+        run: |
+          ./target/release/cmds --version
+          ./target/release/cmds -c 'echo ci-ok'
+          ./target/release/cmds init bash > /dev/null
+          ./target/release/cmds prompt --status 0 > /dev/null
+
+      - name: 冒烟测试（Windows）
+        if: runner.os == 'Windows'
+        run: |
+          ./target/release/cmds.exe --version
+          ./target/release/cmds.exe -c 'echo ci-ok'
+          ./target/release/cmds.exe init powershell | Out-Null
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 构建
+        run: npm run build
+
+      - name: 确认安装脚本随站点一起发布
+        run: |
+          test -f dist/install.sh
+          test -f dist/install.ps1
+          test -f dist/index.html
+
+  scripts:
+    name: 安装脚本
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: sh 语法检查
+        run: sh -n install/install.sh
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=warning install/install.sh
+
+      - name: PowerShell 语法检查
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ./install/install.ps1),
+            [ref]$null,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) { $errors; exit 1 }
+          Write-Host 'install.ps1 语法通过'

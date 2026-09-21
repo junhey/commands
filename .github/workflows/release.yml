@@ -1,0 +1,149 @@
+name: Release
+
+# 打 v* 标签即发布。产物名必须与 install/install.sh、install/install.ps1
+# 里拼出的文件名严格一致：cmds-<target>.tar.gz / cmds-<target>.zip，
+# 并为每个包附带同名的 .sha256，供安装脚本校验。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            linker: aarch64-linux-gnu-gcc
+            apt: gcc-aarch64-linux-gnu
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: 安装交叉编译链接器
+        if: matrix.apt != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ${{ matrix.apt }}
+
+      - name: 构建
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.linker }}" ]; then
+            target_env=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
+            export "CARGO_TARGET_${target_env}_LINKER=${{ matrix.linker }}"
+          fi
+          cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: 打包并计算校验值
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="cmds-${{ matrix.target }}"
+          staging="$(mktemp -d)"
+          mkdir -p "$staging/$name"
+          cp README.md LICENSE "$staging/$name/"
+          cp cli/assets/config.default.toml "$staging/$name/"
+
+          mkdir -p artifacts
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            cp "target/${{ matrix.target }}/release/cmds.exe" "$staging/$name/"
+            (cd "$staging" && 7z a -tzip "$name.zip" "$name" >/dev/null)
+            mv "$staging/$name.zip" "artifacts/"
+            archive="artifacts/$name.zip"
+          else
+            cp "target/${{ matrix.target }}/release/cmds" "$staging/$name/"
+            tar -czf "artifacts/$name.tar.gz" -C "$staging" "$name"
+            archive="artifacts/$name.tar.gz"
+          fi
+
+          # 只写「摘要  文件名」两列，install.sh 用 cut -d' ' -f1 取第一列
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd artifacts && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+          else
+            (cd artifacts && shasum -a 256 "$(basename "$archive")" > "$(basename "$archive").sha256")
+          fi
+          ls -la artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cmds-${{ matrix.target }}
+          path: artifacts/*
+          if-no-files-found: error
+
+  publish:
+    name: 发布 Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+          merge-multiple: true
+
+      - name: 汇总校验值
+        run: |
+          cd downloaded
+          cat *.sha256 > SHA256SUMS
+          echo '--- SHA256SUMS ---'
+          cat SHA256SUMS
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            downloaded/*.tar.gz
+            downloaded/*.zip
+            downloaded/*.sha256
+            downloaded/SHA256SUMS
+          generate_release_notes: true
+          body: |
+            ## 安装
+
+            ```sh
+            # macOS / Linux
+            curl -fsSL https://junhey.github.io/commands/install.sh | sh
+            ```
+
+            ```powershell
+            # Windows
+            irm https://junhey.github.io/commands/install.ps1 | iex
+            ```
+
+            ```sh
+            # 从源码
+            cargo install --locked --git https://github.com/junhey/commands cmds
+            ```
+
+            安装脚本会自动下载对应平台的包并用同名 `.sha256` 校验。
+            手动下载时可以用 `SHA256SUMS` 核对。
