@@ -45,12 +45,19 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
-    // 纯静态站点，第三方依赖单独分包便于长期缓存
+    // 纯静态站点，第三方依赖单独分包便于长期缓存。
+    // Vite 8 起底层换成 rolldown，manualChunks 只接受函数形式，
+    // 对象形式（{ vendor: [...] }）会直接报 "manualChunks is not a function"。
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-          icons: ["lucide-react"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          // lucide-react 名字里也带 react，必须先判断
+          if (id.includes("lucide-react")) return "icons";
+          if (/node_modules[/\\](react|react-dom|scheduler)[/\\]/.test(id)) {
+            return "vendor";
+          }
+          return undefined;
         },
       },
     },
