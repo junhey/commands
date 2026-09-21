@@ -110,10 +110,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          # [ref] 参数必须先声明变量，不能直接传未定义的名字
+          $tokens = $null
+          $errors = $null
+          $path = (Resolve-Path ./install/install.ps1).Path
           $null = [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path ./install/install.ps1),
-            [ref]$null,
-            [ref]$errors
+            $path, [ref]$tokens, [ref]$errors
           )
-          if ($errors.Count -gt 0) { $errors; exit 1 }
-          Write-Host 'install.ps1 语法通过'
+          if ($errors -and $errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host "$($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+          Write-Host "install.ps1 语法通过（$($tokens.Count) 个 token）"
