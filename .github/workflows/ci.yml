@@ -47,6 +47,27 @@ jobs:
       - name: Release 构建
         run: cargo build --release --locked
 
+      # crates.io 只打包 crate 目录内的文件，所以 cli/ 下要自带一份 LICENSE。
+      # 两份必须一致，否则发布出去的许可证会和仓库里的不一样。
+      - name: cli/LICENSE 与根 LICENSE 必须一致
+        if: runner.os == 'Linux'
+        run: |
+          set -eu
+          if ! diff -q LICENSE cli/LICENSE; then
+            echo "::error::cli/LICENSE 与根目录 LICENSE 不一致，请同步（cp LICENSE cli/LICENSE）"
+            exit 1
+          fi
+          echo "两份 LICENSE 一致"
+
+      - name: 校验 crates.io 打包
+        if: runner.os == 'Linux'
+        run: |
+          cargo publish --dry-run -p cmds --locked
+          # README 与 LICENSE 必须在包里，否则 crates.io 页面和许可证都会缺
+          cargo package --list -p cmds | grep -qx 'README.md'
+          cargo package --list -p cmds | grep -qx 'LICENSE'
+          echo "打包内容包含 README.md 与 LICENSE"
+
       - name: 冒烟测试（Unix）
         if: runner.os != 'Windows'
         run: |

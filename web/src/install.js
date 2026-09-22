@@ -38,8 +38,8 @@ export function installMethods(origin, base = "/") {
       {
         id: "cargo",
         label: "从源码",
-        command: `cargo install --locked --git ${BRAND.repoUrl} ${BRAND.bin}`,
-        note: "需要 Rust 1.85+。不依赖本站，也不依赖 Release 资产。",
+        command: `cargo install --locked ${BRAND.bin}`,
+        note: "从 crates.io 安装，需要 Rust 1.85+。不依赖本站，也不依赖 Release 资产。",
       },
     ],
     Linux: [
@@ -53,8 +53,8 @@ export function installMethods(origin, base = "/") {
       {
         id: "cargo",
         label: "从源码",
-        command: `cargo install --locked --git ${BRAND.repoUrl} ${BRAND.bin}`,
-        note: "需要 Rust 1.85+。",
+        command: `cargo install --locked ${BRAND.bin}`,
+        note: "从 crates.io 安装，需要 Rust 1.85+。",
       },
     ],
     Windows: [
@@ -68,8 +68,8 @@ export function installMethods(origin, base = "/") {
       {
         id: "cargo",
         label: "从源码",
-        command: `cargo install --locked --git ${BRAND.repoUrl} ${BRAND.bin}`,
-        note: "需要 Rust 1.85+ 与 MSVC 工具链。",
+        command: `cargo install --locked ${BRAND.bin}`,
+        note: "从 crates.io 安装，需要 Rust 1.85+ 与 MSVC 工具链。",
       },
     ],
     releases,

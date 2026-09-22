@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 发布到 crates.io，`cargo install --locked cmds` 可直接安装。
+  `Release` 工作流打 tag 时自动发布，并在发布前校验 tag 与 `Cargo.toml` 版本一致；
+  未配置 `CARGO_REGISTRY_TOKEN` 时跳过而不是让整条流水线失败
+- README 加上 crates.io / CI / license 三个 badge
+
 ### 修复
 
 - `install.ps1` 补上 SHA-256 校验。README、SECURITY.md 与站点都写了「两个安装脚本都会用
@@ -11,8 +18,18 @@
   现在会下载 `.sha256`、用 `Get-FileHash` 比对，不一致即中止；并新增 `-SkipVerify` 开关，
   与 `install.sh` 的 `--skip-verify` 对齐。安装脚本由站点直接提供，
   推送后即对 Windows 用户生效，不需要重新发版
-- CI 新增一致性检查：两个安装脚本必须同时具备校验逻辑与跳过开关，
-  避免同类「只改了一半」的问题再次溜过
+- 打包给 crates.io 时会缺 LICENSE：registry 只打包 crate 目录内的文件。
+  在 `cli/` 下放一份副本，并由 CI 校验两份一致
+- README 里指向仓库文件的相对链接改为绝对 URL。
+  crates.io 渲染 README 时相对链接会指向 crates.io 自身，点开是 404
+- 安装脚本的源码回退改为优先走 crates.io（有版本语义、不必拉整个仓库），
+  registry 上没有对应版本时再回退到 `--git`
+
+### 其它
+
+- CI 新增三项一致性检查：两个安装脚本必须同时具备校验逻辑与跳过开关；
+  `cli/LICENSE` 与根 `LICENSE` 必须一致；`cargo publish --dry-run` 的打包内容
+  必须包含 README 与 LICENSE。都是把文档里的承诺变成可检查的约束
 
 ## [0.1.0] - 2026-09-22
 

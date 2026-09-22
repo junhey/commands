@@ -1,5 +1,9 @@
 # Commands（`cmds`）
 
+[![crates.io](https://img.shields.io/crates/v/cmds.svg)](https://crates.io/crates/cmds)
+[![CI](https://github.com/junhey/commands/actions/workflows/ci.yml/badge.svg)](https://github.com/junhey/commands/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-ISC-blue.svg)](https://github.com/junhey/commands/blob/master/LICENSE)
+
 > 轻量高效的交互式终端：边打字边给历史建议，`Tab` 弹候选菜单用 `↑` `↓` 选。
 > 提示符沿用 [starship](https://github.com/starship/starship) 的模块化思路，
 > 输入体验取自 [fish](https://fishshell.com/)。一个可执行文件，零运行时依赖。
@@ -32,8 +36,8 @@ irm https://junhey.github.io/commands/install.ps1 | iex
 ```
 
 ```sh
-# 从源码（需要 Rust 1.85+）
-cargo install --locked --git https://github.com/junhey/commands cmds
+# 从 crates.io（需要 Rust 1.85+）
+cargo install --locked cmds
 ```
 
 安装脚本会自动识别平台并优先下载预编译二进制，没有对应平台的包时改用 `cargo` 构建。
@@ -159,7 +163,8 @@ npm run build                 # 静态产物到 web/dist
 ```
 
 `web/src/commands.js` 刻意复刻了 CLI 的几条规则（内建命令清单、候选排序、
-拼写建议算法、历史权重），改了一侧要同步另一侧。细节见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+拼写建议算法、历史权重），改了一侧要同步另一侧。细节见
+[CONTRIBUTING.md](https://github.com/junhey/commands/blob/master/CONTRIBUTING.md)。
 
 ## 隐私
 
@@ -176,5 +181,5 @@ cmds 面向**交互使用**，不是 POSIX sh 的替代品（没有函数、`if/
 
 ## 许可
 
-[ISC](LICENSE)。灵感来自 starship 与 fish，感谢这两个项目。
+[ISC](https://github.com/junhey/commands/blob/master/LICENSE)。灵感来自 starship 与 fish，感谢这两个项目。
 本项目没有复制或重新分发它们的任何代码。

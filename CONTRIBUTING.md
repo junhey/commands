@@ -89,6 +89,21 @@ cmds 面向**交互使用**。以下不在范围内：
 1. 更新 `CHANGELOG.md`
 2. 改 `Cargo.toml` 的 `workspace.package.version` 与 `web/src/commands.js` 里的 `BRAND.version`
 3. `cargo build --locked` 刷新 `Cargo.lock`
-4. 打标签 `git tag v0.1.1 && git push --tags`
+4. 打标签 `git tag -a v0.1.1 -m "..." && git push origin v0.1.1`
 
-Release 工作流会构建六个平台的二进制，附上 `.sha256`，并生成 Release 说明。
+打 tag 后 `Release` 工作流会做三件事：
+
+- 构建六个平台的二进制，附上 `.sha256` 与汇总的 `SHA256SUMS`
+- 创建 GitHub Release
+- 发布到 crates.io（需要仓库 Secret `CARGO_REGISTRY_TOKEN`；没配就跳过并给出警告）
+
+发布前工作流会校验 **tag 版本号与 `Cargo.toml` 一致**，不一致直接失败。
+crates.io 的版本不可撤回，所以只有真正打 tag 才会发 registry，
+不带 tag 的手动触发只做构建验证。
+
+### crates.io 相关的两个约束
+
+- **`cli/LICENSE` 必须与根目录 `LICENSE` 一致。** crates.io 只打包 crate 目录内的文件，
+  所以 `cli/` 下要自带一份。改许可证时记得 `cp LICENSE cli/LICENSE`，CI 会校验。
+- **README 里不要用相对链接。** crates.io 渲染 README 时相对链接会指向 crates.io 自身，
+  点开是 404。指向仓库文件请写完整的 `https://github.com/junhey/commands/blob/master/...`。

@@ -57,14 +57,13 @@ test("一键脚本提供可审阅的原文地址", () => {
   );
 });
 
-test("源码安装指向真实仓库，不依赖站点域名", () => {
+test("源码安装走 crates.io，不依赖站点域名也不依赖 Release", () => {
   const methods = installMethods("https://example.com", "/");
   for (const platform of ["macOS", "Linux", "Windows"]) {
     const cargo = methods[platform].find((item) => item.id === "cargo");
-    assert.equal(
-      cargo.command,
-      "cargo install --locked --git https://github.com/junhey/commands cmds",
-    );
+    assert.equal(cargo.command, "cargo install --locked cmds");
+    // 不应再出现 --git 形式：crates.io 上已经有发布版本
+    assert.ok(!cargo.command.includes("--git"));
   }
 });
 

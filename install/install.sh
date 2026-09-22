@@ -256,9 +256,25 @@ install_from_source() {
 		error "没有预编译包，也没有 cargo；请先安装 Rust：https://rustup.rs"
 		return 1
 	fi
-	info "使用 cargo 从源码构建（首次约 1 分钟）"
-	CARGO_INSTALL_ROOT="$(dirname "$bin_dir")" cargo install --quiet --locked --git "https://github.com/${REPO}" --root "$(dirname "$bin_dir")" "$BIN" 2>/dev/null ||
-		cargo install --locked --git "https://github.com/${REPO}" --root "$(dirname "$bin_dir")" "$BIN"
+	root="$(dirname "$bin_dir")"
+
+	# 先走 crates.io：有版本语义、不需要拉整个仓库。
+	# --version 传的是 vX.Y.Z，cargo 要的是 X.Y.Z，去掉前缀。
+	if [ "$VERSION" = "latest" ]; then
+		info "从 crates.io 安装（首次编译约 1 分钟）"
+		if cargo install --locked --root "$root" "$BIN"; then
+			return 0
+		fi
+	else
+		info "从 crates.io 安装 ${VERSION}（首次编译约 1 分钟）"
+		if cargo install --locked --root "$root" --version "${VERSION#v}" "$BIN"; then
+			return 0
+		fi
+	fi
+
+	# crates.io 上还没有这个版本时，回退到仓库源码
+	warn "crates.io 安装未成功，改从仓库源码构建"
+	cargo install --locked --git "https://github.com/${REPO}" --root "$root" "$BIN"
 }
 
 # ── 主流程 ──────────────────────────────────────────────────────────────
