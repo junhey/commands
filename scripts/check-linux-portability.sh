@@ -99,16 +99,29 @@ elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
 	# 吞掉输出的话，日志里只剩一行「通过」，出问题时也无从判断。
 	for image in debian:10 centos:7 alpine:3.18; do
 		printf '  ── %s\n' "$image"
-		if out=$(docker run --rm -v "$BIN:/cmds:ro" "$image" \
-			/cmds --version 2>&1) &&
-			echoed=$(docker run --rm -v "$BIN:/cmds:ro" "$image" \
-				/cmds -c 'echo container-ok' 2>&1) &&
-			[ "$echoed" = "container-ok" ]; then
-			printf '     %s / %s\n' "$out" "$echoed"
+
+		# 必须先单独把镜像拉下来。docker 把拉取进度写到 stderr，如果连着
+		# `2>&1` 一起捕获，进度文本就会混进待断言的字符串里。
+		# 第一版没这么做：CI 上恰好是第一条命令吸收了拉取噪音、第二条拿到干净输出
+		# 所以通过了，发布时同样的代码却全部报红——断言靠运气就是这个后果。
+		if ! docker pull -q "$image" >/dev/null 2>&1; then
+			fail "${image} 镜像拉取失败（网络问题，不是产物问题）"
+			continue
+		fi
+
+		# 只捕获 stdout；stderr 留着失败时单独打印。
+		version=$(docker run --rm -v "$BIN:/cmds:ro" "$image" \
+			/cmds --version 2>/dev/null || true)
+		echoed=$(docker run --rm -v "$BIN:/cmds:ro" "$image" \
+			/cmds -c 'echo container-ok' 2>/dev/null || true)
+
+		# 断言实际内容，不只看退出码：输出为空时退出码也可能是 0。
+		if [ -n "$version" ] && [ "$echoed" = "container-ok" ]; then
+			printf '     %s / %s\n' "$version" "$echoed"
 		else
 			fail "${image} 里跑不起来"
-			printf '%s\n%s\n' "${out:-}" "${echoed:-}" |
-				head -n 4 | sed 's/^/       /' >&2
+			docker run --rm -v "$BIN:/cmds:ro" "$image" /cmds --version 2>&1 |
+				head -n 3 | sed 's/^/       /' >&2
 		fi
 	done
 else
