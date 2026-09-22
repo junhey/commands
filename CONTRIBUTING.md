@@ -107,3 +107,28 @@ crates.io 的版本不可撤回，所以只有真正打 tag 才会发 registry�
   所以 `cli/` 下要自带一份。改许可证时记得 `cp LICENSE cli/LICENSE`，CI 会校验。
 - **README 里不要用相对链接。** crates.io 渲染 README 时相对链接会指向 crates.io 自身，
   点开是 404。指向仓库文件请写完整的 `https://github.com/junhey/commands/blob/master/...`。
+
+### 首次发布 crates.io 的前置条件
+
+除了仓库 Secret `CARGO_REGISTRY_TOKEN`，**crates.io 账号必须已验证邮箱**，
+否则上传会被拒：
+
+```
+error: failed to publish cmds to registry at https://crates.io
+Caused by:
+  the remote server responded with an error (status 400 Bad Request):
+  A verified email address is required to publish crates to crates.io.
+```
+
+到 <https://crates.io/settings/profile> 填邮箱并点开验证邮件即可。
+这一步只需做一次，`cargo publish --dry-run` 检查不到它（dry-run 不触达服务端校验）。
+
+补救方式：验证邮箱后**单独重跑失败的那个 job**，不用重新打 tag——
+GitHub Release 与预编译二进制已经产出，`crates` job 是独立的：
+
+```sh
+gh run rerun <run-id> --job <job-id>
+```
+
+发布同一版本两次会被 registry 拒绝（`already exists`），工作流已把这种情况视为成功，
+所以重跑是安全的。

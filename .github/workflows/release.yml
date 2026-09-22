@@ -211,8 +211,18 @@ jobs:
           out="$(cargo publish -p cmds --locked --no-verify 2>&1)"
           code=$?
           echo "$out"
-          if [ "$code" -ne 0 ] && echo "$out" | grep -q "already exists"; then
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          if echo "$out" | grep -q "already exists"; then
             echo "::notice::该版本已在 crates.io 上，跳过"
             exit 0
+          fi
+          # 邮箱未验证是最常见的首次发布失败原因，且 dry-run 检查不到，
+          # 这里直接把补救步骤打出来，省得再去翻日志找原因。
+          if echo "$out" | grep -q "verified email address"; then
+            echo "::error::crates.io 账号尚未验证邮箱，无法发布。"
+            echo "::error::到 https://crates.io/settings/profile 填写并验证邮箱，"
+            echo "::error::然后单独重跑本 job 即可，不需要重新打 tag。"
           fi
           exit "$code"
