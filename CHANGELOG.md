@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### 修复
+
+- `install.ps1` 补上 SHA-256 校验。README、SECURITY.md 与站点都写了「两个安装脚本都会用
+  同名 `.sha256` 校验」，但此前只有 `install.sh` 真的实现了，Windows 侧是文档与实现不符。
+  现在会下载 `.sha256`、用 `Get-FileHash` 比对，不一致即中止；并新增 `-SkipVerify` 开关，
+  与 `install.sh` 的 `--skip-verify` 对齐。安装脚本由站点直接提供，
+  推送后即对 Windows 用户生效，不需要重新发版
+- CI 新增一致性检查：两个安装脚本必须同时具备校验逻辑与跳过开关，
+  避免同类「只改了一半」的问题再次溜过
+
 ## [0.1.0] - 2026-09-22
 
 首个版本。由原先分开的两个原型（Rust 交互式 shell 与 React 演示站点）合并为一个产品：

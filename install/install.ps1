@@ -2,6 +2,25 @@
 .SYNOPSIS
     Commands (cmds) 一键安装脚本（Windows）
 
+.DESCRIPTION
+    自动识别平台，优先下载 GitHub Releases 上的预编译包并用同名 .sha256 校验；
+    没有对应平台的包时回退到 cargo 源码构建。安装到当前用户目录，不需要管理员权限。
+
+.PARAMETER BinDir
+    安装目录，默认 %LOCALAPPDATA%\Programs\cmds
+
+.PARAMETER Version
+    要安装的版本，例如 v0.1.0；默认 latest
+
+.PARAMETER Force
+    已存在时静默覆盖
+
+.PARAMETER Build
+    跳过下载，直接用 cargo 从源码构建
+
+.PARAMETER SkipVerify
+    跳过 SHA-256 校验（不建议）
+
 .EXAMPLE
     irm https://junhey.github.io/commands/install.ps1 | iex
 
@@ -13,7 +32,8 @@ param(
     [string]$BinDir = "$env:LOCALAPPDATA\Programs\cmds",
     [string]$Version = 'latest',
     [switch]$Force,
-    [switch]$Build
+    [switch]$Build,
+    [switch]$SkipVerify
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,15 +54,52 @@ function Get-Target {
     "$arch-pc-windows-msvc"
 }
 
+# 校验下载到的压缩包。Release 里每个资产都带同名的 .sha256。
+# 取不到校验文件时只告警、不阻断；摘要不一致则中止安装。
+function Test-Checksum {
+    param([string]$ArchivePath, [string]$ChecksumUrl, [string]$TempDir)
+
+    if ($SkipVerify) {
+        Write-Warn2 '已按要求跳过校验'
+        return $true
+    }
+
+    $checksumFile = Join-Path $TempDir 'checksum.txt'
+    try {
+        Invoke-WebRequest -Uri $ChecksumUrl -OutFile $checksumFile -UseBasicParsing
+    } catch {
+        Write-Warn2 '没有取到校验文件，跳过校验'
+        return $true
+    }
+
+    # 格式为「摘要  文件名」，Windows 侧 sha256sum 会写成「摘要 *文件名」，只取第一列
+    $expected = ((Get-Content $checksumFile -Raw).Trim() -split '\s+')[0]
+    if (-not $expected) {
+        Write-Warn2 '校验文件内容异常，跳过校验'
+        return $true
+    }
+
+    $actual = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash
+    if ($expected -ine $actual) {
+        Write-Err 'SHA-256 校验失败，已放弃安装'
+        Write-Err "  期望：$expected"
+        Write-Err "  实际：$actual"
+        return $false
+    }
+    Write-Ok 'SHA-256 校验通过'
+    return $true
+}
+
 function Install-FromRelease {
     param([string]$Target, [string]$Destination)
 
     $archive = "cmds-$Target.zip"
-    $url = if ($Version -eq 'latest') {
-        "https://github.com/$Repo/releases/latest/download/$archive"
+    $baseUrl = if ($Version -eq 'latest') {
+        "https://github.com/$Repo/releases/latest/download"
     } else {
-        "https://github.com/$Repo/releases/download/$Version/$archive"
+        "https://github.com/$Repo/releases/download/$Version"
     }
+    $url = "$baseUrl/$archive"
 
     $temp = Join-Path $env:TEMP "cmds-install-$([System.Guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Path $temp -Force | Out-Null
@@ -52,6 +109,11 @@ function Install-FromRelease {
     try {
         Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
     } catch {
+        Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+
+    if (-not (Test-Checksum -ArchivePath $zip -ChecksumUrl "$url.sha256" -TempDir $temp)) {
         Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
         return $false
     }

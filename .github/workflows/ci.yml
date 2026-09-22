@@ -122,3 +122,17 @@ jobs:
             exit 1
           }
           Write-Host "install.ps1 语法通过（$($tokens.Count) 个 token）"
+
+      # README / SECURITY.md 都承诺「两个安装脚本都会做 SHA-256 校验」。
+      # 之前 install.ps1 漏了校验却没人发现，这里把承诺变成可检查的约束。
+      - name: 两个安装脚本都必须实现 SHA-256 校验
+        run: |
+          set -eu
+          fail=0
+          grep -q 'sha256' install/install.sh || { echo "install.sh 缺少 sha256 校验"; fail=1; }
+          grep -q 'skip-verify' install/install.sh || { echo "install.sh 缺少 --skip-verify"; fail=1; }
+          grep -qi 'Get-FileHash' install/install.ps1 || { echo "install.ps1 缺少 SHA-256 计算"; fail=1; }
+          grep -q 'SkipVerify' install/install.ps1 || { echo "install.ps1 缺少 -SkipVerify"; fail=1; }
+          grep -q '\.sha256' install/install.ps1 || { echo "install.ps1 没有下载 .sha256"; fail=1; }
+          [ "$fail" -eq 0 ] && echo "两个脚本的校验逻辑都在位"
+          exit "$fail"
