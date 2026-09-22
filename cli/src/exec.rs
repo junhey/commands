@@ -46,7 +46,10 @@ pub fn run_line(shell: &mut Shell, line: &str) -> i32 {
         Ok(Some(node)) => run_node(shell, &node),
         Ok(None) => shell.last_status,
         Err(error) => {
-            eprintln!("cmds: 语法错误：{error}");
+            eprintln!(
+                "{}",
+                tf!("cmds: syntax error: {error}", "cmds: 语法错误：{error}")
+            );
             2
         }
     };
@@ -177,7 +180,13 @@ fn run_pipeline(shell: &mut Shell, pipeline: &Pipeline) -> i32 {
         match child.wait() {
             Ok(exit) => status = exit_code(&exit),
             Err(error) => {
-                eprintln!("cmds: 等待子进程失败：{error}");
+                eprintln!(
+                    "{}",
+                    tf!(
+                        "cmds: failed to wait for the child process: {error}",
+                        "cmds: 等待子进程失败：{error}"
+                    )
+                );
                 status = 1;
             }
         }
@@ -422,10 +431,15 @@ fn is_cmd_builtin(name: &str) -> bool {
 }
 
 fn command_not_found(shell: &mut Shell, name: &str) -> String {
-    let mut message = format!("{name}：未找到命令");
+    let mut message = tf!("{name}: command not found", "{name}：未找到命令");
     let suggestions = shell.similar_commands(name, 3);
     if !suggestions.is_empty() {
-        message.push_str(&format!("，也许你想输入：{}", suggestions.join("、")));
+        // 分隔符也跟着语言走：英文用逗号，中文用顿号。
+        message.push_str(&tf!(
+            ". Did you mean: {}",
+            "，也许你想输入：{}",
+            suggestions.join(t!(", ", "、"))
+        ));
     }
     message
 }

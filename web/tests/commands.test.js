@@ -11,6 +11,10 @@ import {
   similarCommands,
   simulateCommand,
 } from "../src/commands.js";
+import { setLangForTest } from "../src/i18n.js";
+
+// 文案随界面语言变。测试里显式固定语言，别让本机 locale 决定结果。
+setLangForTest("en");
 
 const history = [
   { command: "git status", count: 12 },
@@ -144,7 +148,7 @@ test("输出明确声明是模拟，不会启动任何服务", () => {
   );
   assert.ok(
     simulateCommand("cargo build").output.some((line) =>
-      line.includes("模拟输出"),
+      line.includes("simulated output"),
     ),
   );
 });
@@ -167,11 +171,59 @@ test("true / false 的退出码正确", () => {
 });
 
 test("type 能区分内建、别名、缩写与外部命令", () => {
-  assert.ok(simulateCommand("type cd").output[0].includes("内建"));
-  assert.ok(simulateCommand("type ll").output[0].includes("别名"));
-  assert.ok(simulateCommand("type gcm").output[0].includes("缩写"));
+  assert.ok(simulateCommand("type cd").output[0].includes("builtin"));
+  assert.ok(simulateCommand("type ll").output[0].includes("alias"));
+  assert.ok(simulateCommand("type gcm").output[0].includes("abbreviation"));
   assert.ok(simulateCommand("type git").output[0].includes("/usr/bin/git"));
   assert.equal(simulateCommand("type nope-xyz").exit, 1);
+});
+
+test("中文界面下 type 给出中文说明", () => {
+  setLangForTest("zh");
+  try {
+    assert.ok(simulateCommand("type cd").output[0].includes("内建"));
+    assert.ok(simulateCommand("type ll").output[0].includes("别名"));
+    assert.ok(simulateCommand("type gcm").output[0].includes("缩写"));
+  } finally {
+    setLangForTest("en");
+  }
+});
+
+test("默认英文界面下模拟输出不含中文", () => {
+  setLangForTest("en");
+  const probes = [
+    "help",
+    "jobs",
+    "history",
+    "config path",
+    "config show",
+    "config init",
+    "config reload",
+    "type cd",
+    "type ll",
+    "type gcm",
+    "type nope-xyz",
+    "alias gg=\"git pull\"",
+    "abbr gg \"git pull\"",
+    "git status",
+    "git log",
+    "git push",
+    "npm run dev",
+    "npm run build",
+    "npm install",
+    "cargo build",
+    "cargo test",
+    "nonexistent-command-xyz",
+    "cd /tmp",
+    "cd ;rm -rf /",
+  ];
+  for (const command of probes) {
+    const text = simulateCommand(command).output.join("\n");
+    assert.ok(
+      !/[\u4e00-\u9fff]/.test(text),
+      `英文界面下 \`${command}\` 的输出混进了中文：${text}`,
+    );
+  }
 });
 
 test("config path/init/show 指向真实的配置位置", () => {

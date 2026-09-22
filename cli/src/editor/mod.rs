@@ -232,7 +232,7 @@ impl<'a> Editor<'a> {
         let config = Rc::clone(&self.config);
         let candidates = complete::complete(self.shell, &self.buffer, self.cursor, &config);
         if candidates.is_empty() {
-            self.message = Some("没有可用候选".to_string());
+            self.message = Some(t!("no candidates", "没有可用候选").to_string());
             return;
         }
         if candidates.len() == 1 {
@@ -355,7 +355,7 @@ impl<'a> Editor<'a> {
         }
         let matches = self.history_matches();
         if matches.is_empty() {
-            self.message = Some("没有匹配的历史记录".to_string());
+            self.message = Some(t!("no matching history", "没有匹配的历史记录").to_string());
             return;
         }
         let next = match self.history_index {
@@ -408,13 +408,13 @@ impl<'a> Editor<'a> {
             .map(|command| Candidate {
                 value: command.to_string(),
                 display: command.to_string(),
-                description: "回车即执行".to_string(),
+                description: t!("Enter runs it", "回车即执行").to_string(),
                 kind: CandidateKind::History,
                 replace: replace.clone(),
             })
             .collect();
         let empty = items.is_empty();
-        let title = format!("搜索历史「{term}」");
+        let title = tf!("history search: {term}", "搜索历史「{term}」");
         match self.menu.as_mut() {
             Some(menu) => {
                 menu.items = items;
@@ -432,7 +432,7 @@ impl<'a> Editor<'a> {
             }
         }
         if empty {
-            self.message = Some(format!("没有匹配「{term}」的历史"));
+            self.message = Some(tf!("no history matches {term}", "没有匹配「{term}」的历史"));
         }
     }
 

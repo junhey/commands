@@ -6,8 +6,15 @@ use self::toml::Table;
 use crate::util;
 use std::path::PathBuf;
 
-/// 默认配置模板，`cmds config init` 会写出这份文件。
-pub const DEFAULT_TEMPLATE: &str = include_str!("../../assets/config.default.toml");
+/// 默认配置模板。两份只有注释不同，键值必须完全一致——
+/// `config_template_matches_across_languages` 测试会把这条钉住。
+pub const DEFAULT_TEMPLATE_EN: &str = include_str!("../../assets/config.default.toml");
+pub const DEFAULT_TEMPLATE_ZH: &str = include_str!("../../assets/config.default.zh-CN.toml");
+
+/// `cmds config init` 写出的模板，注释跟着界面语言走。
+pub fn default_template() -> &'static str {
+    crate::i18n::t(DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ZH)
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -336,10 +343,18 @@ impl Config {
                     config = parsed;
                     config.loaded_from = Some(path);
                 }
-                Err(err) => warnings.push(format!("配置解析失败（{}）：{err}", path.display())),
+                Err(err) => warnings.push(tf!(
+                    "cannot parse config ({}): {err}",
+                    "配置解析失败（{}）：{err}",
+                    path.display()
+                )),
             },
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => warnings.push(format!("配置读取失败（{}）：{err}", path.display())),
+            Err(err) => warnings.push(tf!(
+                "cannot read config ({}): {err}",
+                "配置读取失败（{}）：{err}",
+                path.display()
+            )),
         }
         (config, warnings)
     }
@@ -525,8 +540,50 @@ mod tests {
 
     #[test]
     fn default_template_parses() {
-        let config = Config::parse_str(DEFAULT_TEMPLATE).expect("默认模板应可解析");
-        assert!(config.format.contains("$character"));
+        for (name, template) in [("en", DEFAULT_TEMPLATE_EN), ("zh", DEFAULT_TEMPLATE_ZH)] {
+            let config =
+                Config::parse_str(template).unwrap_or_else(|e| panic!("{name} 模板应可解析：{e}"));
+            assert!(
+                config.format.contains("$character"),
+                "{name} 模板缺 $character"
+            );
+        }
+    }
+
+    /// 两份模板只该在注释上不同。把「去掉注释和空行后逐字节相同」钉住，
+    /// 否则改了一份的默认值、另一份没跟上，两种语言的用户拿到的默认配置就不一样了。
+    #[test]
+    fn config_template_matches_across_languages() {
+        fn significant(template: &str) -> Vec<String> {
+            template
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty() && !line.starts_with('#'))
+                .map(str::to_string)
+                .collect()
+        }
+
+        let en = significant(DEFAULT_TEMPLATE_EN);
+        let zh = significant(DEFAULT_TEMPLATE_ZH);
+        assert_eq!(
+            en.len(),
+            zh.len(),
+            "两份模板的有效行数不同：en {} 行 / zh {} 行",
+            en.len(),
+            zh.len()
+        );
+        for (line_en, line_zh) in en.iter().zip(&zh) {
+            assert_eq!(line_en, line_zh, "两份模板的键值不一致");
+        }
+    }
+
+    /// 英文模板不该带中文——它是默认写出的那份。
+    #[test]
+    fn english_template_has_no_chinese() {
+        let offender = DEFAULT_TEMPLATE_EN
+            .lines()
+            .find(|line| line.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)));
+        assert!(offender.is_none(), "英文模板里有中文：{offender:?}");
     }
 
     #[test]

@@ -44,6 +44,26 @@ jobs:
       - name: 单元测试（单线程复跑）
         run: cargo test --locked -- --test-threads=1
 
+      # 站点和 README 都在宣传「N 个单元测试」。写死的数字迟早变成假信息，
+      # 所以只在 web/src/commands.js 的 BRAND.tests 留一份，这里用真实结果校验。
+      - name: 宣传的测试数必须等于真实测试数
+        if: runner.os == 'Linux'
+        run: |
+          set -eu
+          actual=$(cargo test --locked 2>&1 \
+            | sed -nE 's/^test result: ok\. ([0-9]+) passed.*/\1/p' \
+            | awk '{ sum += $1 } END { print sum }')
+          claimed=$(sed -nE 's/^[[:space:]]*tests: ([0-9]+),.*/\1/p' web/src/commands.js)
+          if [ "$actual" != "$claimed" ]; then
+            echo "::error::BRAND.tests 写的是 $claimed，实际有 $actual 个测试，请更新 web/src/commands.js"
+            exit 1
+          fi
+          for f in README.md README.zh-CN.md; do
+            grep -qE "$actual (unit tests|个单元测试)" "$f" \
+              || { echo "::error file=$f::测试数不是 $actual，请同步"; exit 1; }
+          done
+          echo "宣传与实际一致：$actual 个单元测试"
+
       - name: Release 构建
         run: cargo build --release --locked
 
@@ -76,6 +96,13 @@ jobs:
           ./target/release/cmds init bash > /dev/null
           ./target/release/cmds prompt --status 0 > /dev/null
 
+      # 产品对外默认英文。这个检查跑真实进程，两个方向都查：
+      # 英文环境不许出现中文，中文环境不许丢中文（否则「把中文删干净」也能过）。
+      # CI runner 的 locale 是英文，所以默认语言的回归在这里才抓得准。
+      - name: 默认语言（英文环境不得输出中文）
+        if: runner.os != 'Windows'
+        run: sh scripts/check-cli-language.sh ./target/release/cmds
+
       - name: 冒烟测试（Windows）
         if: runner.os == 'Windows'
         run: |
@@ -100,6 +127,12 @@ jobs:
 
       - run: npm ci
 
+      # 站点默认英文。用 oxc 的真 AST 找「没走 t() 的中文字面量」——
+      # 手写词法分析会被 JSX 正文里的撇号和正则字面量带偏（踩过）。
+      - name: 默认语言（源码里不得有裸中文文案）
+        working-directory: .
+        run: node scripts/check-web-language.mjs web/src/*.js web/src/*.jsx
+
       - name: 单元测试
         run: npm test
 
@@ -119,13 +152,21 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: sh 语法检查
-        run: sh -n install/install.sh
+        run: |
+          set -eu
+          for f in install/install.sh scripts/*.sh; do
+            sh -n "$f"
+            echo "sh -n OK: $f"
+          done
 
       - name: shellcheck
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck
           shellcheck --severity=warning install/install.sh
+          # 检查脚本本身用完整模式（不只 warning）：它们是「守门人」，自己出错代价更高。
+          # -x 让 shellcheck 跟进 `. scripts/cjk.sh`，否则会因 SC1091 报错。
+          shellcheck -x scripts/check-cli-language.sh scripts/check-install-language.sh
 
       - name: PowerShell 语法检查
         shell: pwsh
@@ -143,6 +184,12 @@ jobs:
             exit 1
           }
           Write-Host "install.ps1 语法通过（$($tokens.Count) 个 token）"
+
+      # 用户是从 `curl … | sh` 开始接触这个产品的，安装脚本的语言就是第一印象。
+      # 检查逻辑放在脚本里而不是写在这里：一份实现、本地也能跑，
+      # 而且 grep 对中文区间的 locale 坑只需要处理一次（见 scripts/cjk.sh）。
+      - name: 安装脚本默认英文
+        run: sh scripts/check-install-language.sh
 
       # README / SECURITY.md 都承诺「两个安装脚本都会做 SHA-256 校验」。
       # 之前 install.ps1 漏了校验却没人发现，这里把承诺变成可检查的约束。

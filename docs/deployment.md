@@ -1,70 +1,73 @@
-# 部署上线
+# Deployment
 
-站点是纯静态的：没有后端、没有数据库、没有账号体系，构建产物直接丢到任何静态托管上即可。
-唯一的要求是 **`install.sh` / `install.ps1` 必须和页面资源一起放在站点根目录**，
-否则 `curl -fsSL <站点>/install.sh | sh` 取不到脚本。
+> 中文版：[docs/deployment.zh-CN.md](https://github.com/junhey/commands/blob/master/docs/deployment.zh-CN.md)
 
-## 一、GitHub Pages（默认方案）
+The site is fully static: no backend, no database, no accounts. Drop the build output onto any
+static host. The one requirement is that **`install.sh` and `install.ps1` must sit in the site
+root alongside the page assets**, otherwise `curl -fsSL <site>/install.sh | sh` cannot fetch them.
 
-仓库里的 `.github/workflows/pages.yml` 已经配好了。首次启用：
+## 1. GitHub Pages (the default)
 
-1. 仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**
-2. 推一次 `master`，或手动触发 `Deploy site` 工作流
+`.github/workflows/pages.yml` is already set up. To enable it the first time:
 
-站点地址：`https://junhey.github.io/commands/`
-安装地址：`https://junhey.github.io/commands/install.sh`
+1. **Settings → Pages → Build and deployment → Source** → choose **GitHub Actions**
+2. Push to `master`, or trigger the `Deploy site` workflow manually
 
-工作流会自动把 `VITE_BASE` 设成 `/<仓库名>/`，所以子路径下资源引用是正确的。
-页面用 hash 路由（`#config`、`#guide`），不需要服务端 rewrite。
+Site: `https://junhey.github.io/commands/`
+Installer: `https://junhey.github.io/commands/install.sh`
 
-> **私有仓库注意**：GitHub 对私有仓库启用 Pages 需要 Pro 或组织套餐。
-> 仓库是私有且没有相应套餐时，`Deploy site` 会在部署一步失败，
-> 但不影响 `CI` 与 `Release` 两个工作流。改为公开仓库后即可正常发布。
+The workflow sets `VITE_BASE` to `/<repo>/` automatically, so asset references are correct under
+the sub-path. The page uses hash routing (`#config`, `#guide`), so no server-side rewrite is
+needed.
 
-## 二、自己的域名
+> **Private repositories:** GitHub requires a Pro or organisation plan to enable Pages on a
+> private repository. Without one, `Deploy site` fails at the deploy step while `CI` and `Release`
+> keep working. Making the repository public fixes it.
+
+## 2. Your own domain
 
 ```sh
 cd web
 npm ci
-VITE_BASE=/ npm run build      # 部署在域名根目录时 base 用 /
-# 把 web/dist/ 整个目录上传到托管
+VITE_BASE=/ npm run build      # base is / when deploying at the domain root
+# upload the whole web/dist/ directory to your host
 ```
 
-部署在根目录时安装命令就变成：
+Deployed at the root, the install command becomes:
 
 ```sh
-curl -fsSL https://你的域名/install.sh | sh
+curl -fsSL https://your-domain/install.sh | sh
 ```
 
-站点上的安装对话框会用**运行时的 origin + base** 推导地址，不需要改代码——
-换域名后显示的命令会自动跟着变。
+The install dialog on the site derives the URL from the **runtime origin + base**, so no code
+change is needed — the command shown updates itself when the domain changes.
 
 ### Cloudflare Pages / Vercel / Netlify
 
-| 项 | 值 |
+| Setting | Value |
 | --- | --- |
-| 构建命令 | `npm ci && npm run build` |
-| 构建目录 | `web` |
-| 产物目录 | `web/dist` |
-| 环境变量 | `VITE_BASE=/` |
-| Node 版本 | 20.19+ 或 22+ |
+| Build command | `npm ci && npm run build` |
+| Build directory | `web` |
+| Output directory | `web/dist` |
+| Environment variable | `VITE_BASE=/` |
+| Node version | 20.19+ or 22+ |
 
 ### Nginx
 
 ```nginx
 server {
     listen 443 ssl;
-    server_name 你的域名;
+    server_name your-domain;
     root /var/www/commands;
 
-    # 安装脚本要以纯文本返回，且不允许浏览器猜类型
+    # install scripts must come back as plain text, and no sniffing
     location ~ ^/install\.(sh|ps1)$ {
         default_type text/plain;
         add_header X-Content-Type-Options nosniff;
         add_header Cache-Control "public, max-age=300";
     }
 
-    # 带 hash 的静态资源可以长缓存
+    # hashed assets can be cached forever
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
@@ -75,17 +78,17 @@ server {
 }
 ```
 
-## 三、二进制分发
+## 3. Binary distribution
 
-站点只负责分发**安装脚本**，真正的二进制在 GitHub Releases 上。
-打个 `v*` 标签就会触发 `Release` 工作流：
+The site only distributes the **install scripts**; the binaries themselves live on GitHub
+Releases. Pushing a `v*` tag triggers the `Release` workflow:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
-产出六个平台的包，命名必须与安装脚本里拼出的一致：
+It produces packages for six platforms, and the names must match what the install script builds:
 
 ```
 cmds-x86_64-unknown-linux-gnu.tar.gz    (+ .sha256)
@@ -97,25 +100,31 @@ cmds-aarch64-pc-windows-msvc.zip        (+ .sha256)
 SHA256SUMS
 ```
 
-> 改动 `install.sh` 里的 `BIN` / `REPO`，或改动 Release 工作流里的包名时，
-> **两边必须同时改**，否则一键安装会 404 后静默退化成 `cargo` 源码构建。
+> When you change `BIN` / `REPO` in `install.sh`, or the package names in the Release workflow,
+> **change both sides together**. Otherwise one-line install 404s and silently degrades to a
+> `cargo` source build.
 
-没有 Release 时安装脚本仍可用：取不到预编译包会自动回退到
-`cargo install --locked --git ...`，只是首次安装慢一些。
+The install script still works without any Release: if it cannot fetch a prebuilt package it
+falls back to `cargo install --locked --git ...`, just slower on first install.
 
-## 四、上线前检查
+## 4. Pre-launch checklist
 
 ```sh
-# 产物里有安装脚本
+# the install scripts are in the build output
 cd web && VITE_BASE=/ npm run build
 test -f dist/install.sh && test -f dist/install.ps1
 
-# 本地起一份产物，按站点上显示的命令实际跑一遍
+# serve the output locally and actually run the command the site shows
 npm run preview
 curl -fsSL http://localhost:4173/install.sh | head -20
+
+# the installer must be English by default
+env -u LANG -u LC_MESSAGES LC_ALL=C sh dist/install.sh --help | grep -q '[一-龥]' \
+  && echo 'BROKEN: Chinese in an English environment' || echo 'default language OK'
 ```
 
-- [ ] `install.sh` 与 `install.ps1` 在站点根目录，返回 `text/plain`
-- [ ] 安装对话框显示的域名是你的真实域名
-- [ ] Releases 里有对应平台的包与 `.sha256`
-- [ ] 至少在一台干净机器上跑通一键安装
+- [ ] `install.sh` and `install.ps1` are in the site root and return `text/plain`
+- [ ] The domain shown in the install dialog is your real domain
+- [ ] Releases contain the packages and `.sha256` files for each platform
+- [ ] One-line install verified on at least one clean machine
+- [ ] The site renders in English by default, and the sidebar language switch works

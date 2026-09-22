@@ -6,6 +6,7 @@
  */
 
 import { BRAND } from "./commands.js";
+import { t } from "./i18n.js";
 
 /** 把 origin 与 base 拼成可直接访问的资源地址。 */
 export function assetUrl(file, origin, base = "/") {
@@ -30,67 +31,106 @@ export function installMethods(origin, base = "/") {
     macOS: [
       {
         id: "script",
-        label: "一键安装",
+        label: t("One-liner", "一键安装"),
         command: `curl -fsSL ${shUrl} | sh`,
         inspect: shUrl,
-        note: "用户级安装，不需要 sudo，也不会改动你的 shell 启动文件。优先下载预编译二进制，没有对应平台的包时回退到 cargo 构建。",
+        note: t(
+          "Installs for your user only: no sudo, and it never edits your shell startup files. Prefers a prebuilt binary and falls back to a cargo build when no package matches.",
+          "用户级安装，不需要 sudo，也不会改动你的 shell 启动文件。优先下载预编译二进制，没有对应平台的包时回退到 cargo 构建。",
+        ),
       },
       {
         id: "cargo",
-        label: "从源码",
+        label: t("From source", "从源码"),
         command: `cargo install --locked ${BRAND.bin}`,
-        note: "从 crates.io 安装，需要 Rust 1.85+。不依赖本站，也不依赖 Release 资产。",
+        note: t(
+          "Installs from crates.io; needs Rust 1.85+. Depends on neither this site nor the release assets.",
+          "从 crates.io 安装，需要 Rust 1.85+。不依赖本站，也不依赖 Release 资产。",
+        ),
       },
     ],
     Linux: [
       {
         id: "script",
-        label: "一键安装",
+        label: t("One-liner", "一键安装"),
         command: `curl -fsSL ${shUrl} | sh`,
         inspect: shUrl,
-        note: "支持 x86_64 / aarch64 / armv7 / riscv64。安装目录默认 /usr/local/bin，不可写时自动改用 ~/.local/bin。",
+        note: t(
+          "Supports x86_64 / aarch64 / armv7 / riscv64. Installs to /usr/local/bin when writable, otherwise ~/.local/bin.",
+          "支持 x86_64 / aarch64 / armv7 / riscv64。安装目录默认 /usr/local/bin，不可写时自动改用 ~/.local/bin。",
+        ),
       },
       {
         id: "cargo",
-        label: "从源码",
+        label: t("From source", "从源码"),
         command: `cargo install --locked ${BRAND.bin}`,
-        note: "从 crates.io 安装，需要 Rust 1.85+。",
+        note: t(
+          "Installs from crates.io; needs Rust 1.85+.",
+          "从 crates.io 安装，需要 Rust 1.85+。",
+        ),
       },
     ],
     Windows: [
       {
         id: "script",
-        label: "一键安装",
+        label: t("One-liner", "一键安装"),
         command: `irm ${ps1Url} | iex`,
         inspect: ps1Url,
-        note: "安装到 %LOCALAPPDATA%\\Programs\\cmds，并把该目录加入当前用户 PATH。不需要管理员权限。",
+        note: t(
+          "Installs to %LOCALAPPDATA%\\Programs\\cmds and adds that directory to your user PATH. No administrator rights needed.",
+          "安装到 %LOCALAPPDATA%\\Programs\\cmds，并把该目录加入当前用户 PATH。不需要管理员权限。",
+        ),
       },
       {
         id: "cargo",
-        label: "从源码",
+        label: t("From source", "从源码"),
         command: `cargo install --locked ${BRAND.bin}`,
-        note: "从 crates.io 安装，需要 Rust 1.85+ 与 MSVC 工具链。",
+        note: t(
+          "Installs from crates.io; needs Rust 1.85+ and the MSVC toolchain.",
+          "从 crates.io 安装，需要 Rust 1.85+ 与 MSVC 工具链。",
+        ),
       },
     ],
     releases,
   };
 }
 
-/** 安装后的三步上手提示。 */
+/** 安装后的三步上手提示。文案用 getter，语言切换后要跟着变。 */
 export const nextSteps = [
   {
-    title: "直接启动",
-    body: `运行 ${BRAND.bin}，输入 help 查看全部快捷键与内建命令。`,
+    get title() {
+      return t("Start it", "直接启动");
+    },
+    get body() {
+      return t(
+        `Run ${BRAND.bin}, then type help for every keybinding and builtin.`,
+        `运行 ${BRAND.bin}，输入 help 查看全部快捷键与内建命令。`,
+      );
+    },
     command: BRAND.bin,
   },
   {
-    title: "生成配置",
-    body: `${BRAND.bin} config init 会写出 ~/.config/${BRAND.bin}/config.toml，也可以在 Config 页可视化生成。`,
+    get title() {
+      return t("Write a config", "生成配置");
+    },
+    get body() {
+      return t(
+        `${BRAND.bin} config init writes ~/.config/${BRAND.bin}/config.toml; the Config page can generate it visually too.`,
+        `${BRAND.bin} config init 会写出 ~/.config/${BRAND.bin}/config.toml，也可以在 Config 页可视化生成。`,
+      );
+    },
     command: `${BRAND.bin} config init`,
   },
   {
-    title: "只想用它的提示符",
-    body: "保留现有的 bash / zsh / fish / PowerShell，只接管提示符渲染。",
+    get title() {
+      return t("Only want the prompt", "只想用它的提示符");
+    },
+    get body() {
+      return t(
+        "Keep your current bash / zsh / fish / PowerShell and let cmds render just the prompt.",
+        "保留现有的 bash / zsh / fish / PowerShell，只接管提示符渲染。",
+      );
+    },
     command: `eval "$(${BRAND.bin} init bash)"`,
   },
 ];

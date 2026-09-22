@@ -8,43 +8,97 @@
  *  - 拼错命令的建议算法与 cli/src/shell.rs 的 similar_commands 一致
  *
  * 所有命令都是模拟执行：不读本地文件、不起进程、不发网络请求。
+ *
+ * 文案跟着 i18n 走。常量里的文案用 getter 而不是直接求值——模块加载时语言可能
+ * 还没确定，而且用户在页面上切换语言后这些值要跟着变。
  */
+
+import { t } from "./i18n.js";
 
 export const BRAND = {
   name: "Commands",
   bin: "cmds",
-  version: "0.1.2",
+  version: "0.2.0",
   repo: "junhey/commands",
   repoUrl: "https://github.com/junhey/commands",
-  tagline: "少敲一点，多做一点。",
+  // 单元测试数。页面和 README 都在宣传这个数字，散着写迟早对不上，
+  // 所以只留这一处；CI 的 docs job 会拿 `cargo test` 的真实结果校验它。
+  tests: 109,
+  get tagline() {
+    return t("Type less, do more.", "少敲一点，多做一点。");
+  },
 };
 
-/** 与 cli/src/builtins.rs 的 BUILTINS 对齐。 */
+/**
+ * 与 cli/src/builtins.rs 的 BUILTINS 对齐，三元组是 [名称, 英文说明, 中文说明]。
+ *
+ * i18n-pairs-begin —— 下面是刻意的双语表，不是漏翻译，
+ * 交给 builtinDescription() 按当前语言取值。
+ */
 export const builtins = [
-  ["abbr", "查看/设置缩写，输入后按空格展开"],
-  ["alias", "查看/设置别名"],
-  ["cd", "切换目录，cd - 回到上一个目录"],
-  ["clear", "清屏"],
-  ["config", "配置管理：path / init / reload / show"],
-  ["echo", "输出文本，支持 -n / -e"],
-  ["exit", "退出 shell，可带退出码"],
-  ["export", "设置环境变量，也可写作 set"],
-  ["false", "什么都不做，返回 1"],
-  ["help", "查看使用说明与快捷键"],
-  ["history", "查看/搜索/清空历史"],
-  ["jobs", "查看后台任务"],
-  ["pwd", "打印当前目录"],
-  ["set", "设置环境变量（export 的别名）"],
-  ["source", "在当前 shell 执行脚本，别名 ."],
-  ["true", "什么都不做，返回 0"],
-  ["type", "查看命令类型，别名 which"],
-  ["unabbr", "删除缩写"],
-  ["unalias", "删除别名"],
-  ["unset", "删除环境变量"],
-  ["which", "查看命令类型"],
+  [
+    "abbr",
+    "Show or set abbreviations; they expand when you press space",
+    "查看/设置缩写，输入后按空格展开",
+  ],
+  ["alias", "Show or set aliases", "查看/设置别名"],
+  [
+    "cd",
+    "Change directory; cd - goes back to the previous one",
+    "切换目录，cd - 回到上一个目录",
+  ],
+  ["clear", "Clear the screen", "清屏"],
+  [
+    "config",
+    "Manage configuration: path / init / reload / show",
+    "配置管理：path / init / reload / show",
+  ],
+  ["echo", "Print text; supports -n / -e", "输出文本，支持 -n / -e"],
+  [
+    "exit",
+    "Leave the shell, optionally with a status code",
+    "退出 shell，可带退出码",
+  ],
+  [
+    "export",
+    "Set an environment variable; also spelled set",
+    "设置环境变量，也可写作 set",
+  ],
+  ["false", "Do nothing, return 1", "什么都不做，返回 1"],
+  ["help", "Show usage and keybindings", "查看使用说明与快捷键"],
+  ["history", "Show, search or clear history", "查看/搜索/清空历史"],
+  ["jobs", "List background jobs", "查看后台任务"],
+  ["pwd", "Print the current directory", "打印当前目录"],
+  [
+    "set",
+    "Set an environment variable (alias of export)",
+    "设置环境变量（export 的别名）",
+  ],
+  [
+    "source",
+    "Run a script in the current shell; alias .",
+    "在当前 shell 执行脚本，别名 .",
+  ],
+  ["true", "Do nothing, return 0", "什么都不做，返回 0"],
+  [
+    "type",
+    "Show how a command resolves; alias which",
+    "查看命令类型，别名 which",
+  ],
+  ["unabbr", "Remove an abbreviation", "删除缩写"],
+  ["unalias", "Remove an alias", "删除别名"],
+  ["unset", "Remove an environment variable", "删除环境变量"],
+  ["which", "Show how a command resolves", "查看命令类型"],
+  // i18n-pairs-end
 ];
 
 export const builtinNames = builtins.map(([name]) => name);
+
+/** 取某个内建命令在当前语言下的一句话说明。 */
+export function builtinDescription(name) {
+  const found = builtins.find(([candidate]) => candidate === name);
+  return found ? t(found[1], found[2]) : "";
+}
 
 /** 演示用的 PATH 命令表，模拟真实机器上能补全到的外部命令。 */
 export const pathCommands = [
@@ -78,121 +132,149 @@ export const defaultAliases = {
 export const commandCatalog = [
   {
     command: "git status",
-    description: "看看工作区改了什么",
+    get description() {
+      return t("See what changed in your working tree", "看看工作区改了什么");
+    },
     group: "Git",
     source: "history",
   },
   {
-    command: 'git commit -m "fix: 补全越界"',
-    description: "提交当前暂存的改动",
+    command: 'git commit -m "fix: guard the bounds"',
+    get description() {
+      return t("Commit what is currently staged", "提交当前暂存的改动");
+    },
     group: "Git",
     source: "history",
   },
   {
     command: "git checkout -b feature/menu",
-    description: "新建并切换分支",
+    get description() {
+      return t("Create a branch and switch to it", "新建并切换分支");
+    },
     group: "Git",
     source: "history",
   },
   {
     command: "git log --oneline -5",
-    description: "最近五条提交",
+    get description() {
+      return t("The last five commits", "最近五条提交");
+    },
     group: "Git",
     source: "suggested",
   },
   {
     command: "git diff",
-    description: "查看未暂存的改动",
+    get description() {
+      return t("Review unstaged changes", "查看未暂存的改动");
+    },
     group: "Git",
     source: "suggested",
   },
   {
     command: "cargo build --release --locked",
-    description: "构建发布版二进制",
+    get description() {
+      return t("Build the release binary", "构建发布版二进制");
+    },
     group: "Rust",
     source: "history",
   },
   {
     command: "cargo test",
-    description: "跑单元测试",
+    get description() {
+      return t("Run the unit tests", "跑单元测试");
+    },
     group: "Rust",
     source: "suggested",
   },
   {
     command: "npm run dev",
-    description: "启动本地开发服务",
+    get description() {
+      return t("Start the local dev server", "启动本地开发服务");
+    },
     group: "Node.js",
     source: "history",
   },
   {
     command: "npm run build",
-    description: "产出生产构建",
+    get description() {
+      return t("Produce a production build", "产出生产构建");
+    },
     group: "Node.js",
     source: "suggested",
   },
   {
     command: "ls -lah",
-    description: "列出全部文件与详情",
+    get description() {
+      return t("List every file with details", "列出全部文件与详情");
+    },
     group: "Files",
     source: "history",
   },
   {
     command: "pwd",
-    description: "打印当前目录",
+    get description() {
+      return t("Print the current directory", "打印当前目录");
+    },
     group: "Shell",
     source: "suggested",
   },
   {
     command: 'abbr gcm "git commit -m"',
-    description: "定义一个 fish 式缩写",
+    get description() {
+      return t("Define a fish-style abbreviation", "定义一个 fish 式缩写");
+    },
     group: "Shell",
     source: "suggested",
   },
   {
     command: "config init",
-    description: "生成配置模板",
+    get description() {
+      return t("Write a config template", "生成配置模板");
+    },
     group: "Shell",
     source: "suggested",
   },
   {
     command: "help",
-    description: "查看全部快捷键与内建命令",
+    get description() {
+      return t("Show every keybinding and builtin", "查看全部快捷键与内建命令");
+    },
     group: "Shell",
     source: "suggested",
   },
 ];
 
 export const initialHistory = [
-  { command: "git status", time: "2 分钟前", shell: "cmds", exit: 0, count: 12 },
+  { command: "git status", get time() { return t("2 minutes ago", "2 分钟前"); }, shell: "cmds", exit: 0, count: 12 },
   {
     command: "cargo build --release --locked",
-    time: "6 分钟前",
+    get time() { return t("6 minutes ago", "6 分钟前"); },
     shell: "cmds",
     exit: 0,
     count: 8,
   },
   {
-    command: 'git commit -m "fix: 补全越界"',
-    time: "18 分钟前",
+    command: 'git commit -m "fix: guard the bounds"',
+    get time() { return t("18 minutes ago", "18 分钟前"); },
     shell: "cmds",
     exit: 0,
     count: 12,
   },
   {
     command: "git checkout -b feature/menu",
-    time: "25 分钟前",
+    get time() { return t("25 minutes ago", "25 分钟前"); },
     shell: "cmds",
     exit: 0,
     count: 5,
   },
   {
     command: "npm run dev",
-    time: "40 分钟前",
+    get time() { return t("40 minutes ago", "40 分钟前"); },
     shell: "cmds",
     exit: 0,
     count: 6,
   },
-  { command: "ls -lah", time: "52 分钟前", shell: "cmds", exit: 0, count: 21 },
+  { command: "ls -lah", get time() { return t("52 minutes ago", "52 分钟前"); }, shell: "cmds", exit: 0, count: 21 },
 ];
 
 /* ─────────────────────────── 通用算法 ─────────────────────────── */
@@ -282,7 +364,8 @@ export function getSuggestions(query, history = [], settings = {}) {
       : history.map((item, index) => ({
           command: item.command,
           description:
-            catalog.get(item.command)?.description ?? "来自你的历史记录",
+            catalog.get(item.command)?.description ??
+            t("from your history", "来自你的历史记录"),
           source: "history",
           // 频率 + 新鲜度：与 CLI 的历史排序同思路
           weight: (item.count ?? 1) * 100 - index,
@@ -353,14 +436,16 @@ export function isKnownCommand(name, extras = {}) {
 
 /* ─────────────────────── 配置模板生成 ─────────────────────── */
 
+/** 三元组是 [占位符, 英文标签, 中文标签]。i18n-pairs-begin */
 export const promptModules = [
-  ["$dir", "当前目录"],
-  ["$git_branch", "Git 分支"],
-  ["$git_status", "Git 状态"],
-  ["$languages", "语言与版本"],
-  ["$cmd_duration", "上条命令耗时"],
-  ["$status", "上条命令退出码"],
-  ["$character", "提示符号 ❯"],
+  ["$dir", "Current directory", "当前目录"],
+  ["$git_branch", "Git branch", "Git 分支"],
+  ["$git_status", "Git status", "Git 状态"],
+  ["$languages", "Languages and versions", "语言与版本"],
+  ["$cmd_duration", "Last command duration", "上条命令耗时"],
+  ["$status", "Last exit code", "上条命令退出码"],
+  ["$character", "Prompt character ❯", "提示符号 ❯"],
+  // i18n-pairs-end
 ];
 
 const MODULE_ORDER = promptModules.map(([id]) => id);
@@ -388,8 +473,14 @@ export function buildConfigToml(options = {}) {
     (hasCharacter ? `${lineBreak ? "$line_break" : ""}$character` : "");
 
   const lines = [
-    `# ${BRAND.name} (${BRAND.bin}) 配置 · 由官网生成`,
-    `# 保存到 ~/.config/${BRAND.bin}/config.toml，或用 \`${BRAND.bin} config init\` 生成默认模板`,
+    `# ${BRAND.name} (${BRAND.bin}) ${t(
+      "configuration · generated on the website",
+      "配置 · 由官网生成",
+    )}`,
+    t(
+      `# Save to ~/.config/${BRAND.bin}/config.toml, or run \`${BRAND.bin} config init\` for the default template`,
+      `# 保存到 ~/.config/${BRAND.bin}/config.toml，或用 \`${BRAND.bin} config init\` 生成默认模板`,
+    ),
     "",
     `format = "${format || "$character"}"`,
     `add_newline = ${addNewline}`,
@@ -405,7 +496,10 @@ export function buildConfigToml(options = {}) {
     "[git]",
     gitStatus
       ? "status_enabled = true"
-      : "status_enabled = false   # 超大仓库关掉可以明显提速",
+      : t(
+          "status_enabled = false   # turning this off speeds up huge repositories",
+          "status_enabled = false   # 超大仓库关掉可以明显提速",
+        ),
   ];
 
   const aliasEntries = Object.entries(aliases);
@@ -429,29 +523,60 @@ export function buildConfigToml(options = {}) {
 
 /* ─────────────────────────── 模拟执行 ─────────────────────────── */
 
-const SIMULATED = "（Playground 模拟输出，本机没有任何命令被真正执行）";
+const SIMULATED = () =>
+  t(
+    "(simulated output — nothing was actually executed on your machine)",
+    "（Playground 模拟输出，本机没有任何命令被真正执行）",
+  );
 const GUIDE_URL = "https://junhey.github.io/commands/#guide";
 
 function helpOutput() {
   return [
-    `${BRAND.name} (${BRAND.bin}) v${BRAND.version} — 轻量高效的交互式终端`,
+    `${BRAND.name} (${BRAND.bin}) v${BRAND.version} — ${t(
+      "a small, fast interactive shell",
+      "轻量高效的交互式终端",
+    )}`,
     "",
-    "快捷键",
-    "  Tab / Shift-Tab      打开候选菜单 / 菜单内上一项",
-    "  ↑ ↓ (Ctrl-P/Ctrl-N)  菜单内移动；菜单关闭时按前缀翻历史",
-    "  Enter                菜单打开时采纳候选，否则执行",
-    "  → / End / Ctrl-F     采纳整条灰色历史建议",
-    "  Alt-→                只采纳建议里的一个词",
-    "  Ctrl-R               模糊搜索历史",
-    "  Ctrl-A/E/W/U/K/L     行首 / 行尾 / 删词 / 删到行首 / 删到行尾 / 清屏",
-    "  Ctrl-C / Ctrl-D      放弃当前输入 / 空行退出",
-    "",
-    "内建命令",
-    ...builtins.map(
-      ([name, description]) => `  ${name.padEnd(9)} ${description}`,
+    t("Keybindings", "快捷键"),
+    t(
+      "  Tab / Shift-Tab      open the candidate menu / previous item",
+      "  Tab / Shift-Tab      打开候选菜单 / 菜单内上一项",
+    ),
+    t(
+      "  ↑ ↓ (Ctrl-P/Ctrl-N)  move in the menu; with it closed, walk history by prefix",
+      "  ↑ ↓ (Ctrl-P/Ctrl-N)  菜单内移动；菜单关闭时按前缀翻历史",
+    ),
+    t(
+      "  Enter                accept the candidate when the menu is open, else run",
+      "  Enter                菜单打开时采纳候选，否则执行",
+    ),
+    t(
+      "  → / End / Ctrl-F     accept the whole grey history suggestion",
+      "  → / End / Ctrl-F     采纳整条灰色历史建议",
+    ),
+    t(
+      "  Alt-→                accept just one word of the suggestion",
+      "  Alt-→                只采纳建议里的一个词",
+    ),
+    t(
+      "  Ctrl-R               fuzzy-search history",
+      "  Ctrl-R               模糊搜索历史",
+    ),
+    t(
+      "  Ctrl-A/E/W/U/K/L     line start / end / del word / to start / to end / clear",
+      "  Ctrl-A/E/W/U/K/L     行首 / 行尾 / 删词 / 删到行首 / 删到行尾 / 清屏",
+    ),
+    t(
+      "  Ctrl-C / Ctrl-D      drop the current line / exit on an empty line",
+      "  Ctrl-C / Ctrl-D      放弃当前输入 / 空行退出",
     ),
     "",
-    `文档：${GUIDE_URL}`,
+    t("Builtins", "内建命令"),
+    ...builtins.map(
+      ([name, en, zh]) => `  ${name.padEnd(9)} ${t(en, zh)}`,
+    ),
+    "",
+    `${t("Docs", "文档")}: ${GUIDE_URL}`,
   ];
 }
 
@@ -495,7 +620,15 @@ export function simulateCommand(
   if (head === "cd") {
     const destination = rest || "~";
     if (/[;&|<>`$()]/.test(destination)) {
-      return { output: ["Playground: 只支持简单的目录路径。"], exit: 1 };
+      return {
+        output: [
+          t(
+            "Playground: only simple directory paths are supported.",
+            "Playground: 只支持简单的目录路径。",
+          ),
+        ],
+        exit: 1,
+      };
     }
     if (destination === "-") {
       return { output: [], cwd: state.previousCwd ?? cwd, exit: 0 };
@@ -522,7 +655,10 @@ export function simulateCommand(
         exit: 0,
       };
     }
-    return { output: [`已记录别名：${rest}`, SIMULATED], exit: 0 };
+    return {
+      output: [`${t("alias recorded: ", "已记录别名：")}${rest}`, SIMULATED()],
+      exit: 0,
+    };
   }
 
   if (head === "abbr") {
@@ -536,32 +672,55 @@ export function simulateCommand(
     }
     return {
       output: [
-        `已记录缩写：${rest}`,
-        "输入缩写后按空格即展开，历史里保存的是展开后的完整命令。",
-        SIMULATED,
+        `${t("abbreviation recorded: ", "已记录缩写：")}${rest}`,
+        t(
+          "Type it and press space to expand; history keeps the full command.",
+          "输入缩写后按空格即展开，历史里保存的是展开后的完整命令。",
+        ),
+        SIMULATED(),
       ],
       exit: 0,
     };
   }
 
   if (head === "type" || head === "which") {
-    if (!rest) return { output: [`${head}: 需要一个命令名`], exit: 2 };
+    if (!rest)
+      return {
+        output: [`${head}: ${t("needs a command name", "需要一个命令名")}`],
+        exit: 2,
+      };
     if (builtinNames.includes(rest)) {
-      return { output: [`${rest} 是内建命令`], exit: 0 };
+      return {
+        output: [`${rest} ${t("is a builtin", "是内建命令")}`],
+        exit: 0,
+      };
     }
     if (Object.prototype.hasOwnProperty.call(aliases, rest)) {
-      return { output: [`${rest} 是别名，展开为 ${aliases[rest]}`], exit: 0 };
+      return {
+        output: [
+          `${rest} ${t("is an alias for", "是别名，展开为")} ${aliases[rest]}`,
+        ],
+        exit: 0,
+      };
     }
     if (Object.prototype.hasOwnProperty.call(abbreviations, rest)) {
       return {
-        output: [`${rest} 是缩写，展开为 ${abbreviations[rest]}`],
+        output: [
+          `${rest} ${t("is an abbreviation for", "是缩写，展开为")} ${abbreviations[rest]}`,
+        ],
         exit: 0,
       };
     }
     if (pathCommands.includes(rest)) {
-      return { output: [`${rest} 位于 /usr/bin/${rest}`], exit: 0 };
+      return {
+        output: [`${rest} ${t("is", "位于")} /usr/bin/${rest}`],
+        exit: 0,
+      };
     }
-    return { output: [`${rest}：未找到`], exit: 1 };
+    return {
+      output: [`${rest}${t(": not found", "：未找到")}`],
+      exit: 1,
+    };
   }
 
   if (head === "history") {
@@ -571,20 +730,24 @@ export function simulateCommand(
         ? entries.map(
             (item, index) => `${String(index + 1).padStart(4)}  ${item.command}`,
           )
-        : ["（历史为空）"],
+        : [t("(history is empty)", "（历史为空）")],
       exit: 0,
     };
   }
 
-  if (head === "jobs") return { output: ["（没有后台任务）"], exit: 0 };
+  if (head === "jobs")
+    return {
+      output: [t("(no background jobs)", "（没有后台任务）")],
+      exit: 0,
+    };
 
   if (head === "config") {
     const sub = splitWords(rest)[0] ?? "show";
     if (sub === "path") {
       return {
         output: [
-          "配置文件：/home/you/.config/cmds/config.toml",
-          "历史文件：/home/you/.local/share/cmds/history",
+          `${t("Config file: ", "配置文件：")}/home/you/.config/cmds/config.toml`,
+          `${t("History file: ", "历史文件：")}/home/you/.local/share/cmds/history`,
         ],
         exit: 0,
       };
@@ -592,21 +755,27 @@ export function simulateCommand(
     if (sub === "init") {
       return {
         output: [
-          "已写出配置模板：/home/you/.config/cmds/config.toml",
-          "在网站的 Config 页可以可视化生成同一份文件。",
-          SIMULATED,
+          `${t("Wrote the config template: ", "已写出配置模板：")}/home/you/.config/cmds/config.toml`,
+          t(
+            "The Config page on this site generates the same file visually.",
+            "在网站的 Config 页可以可视化生成同一份文件。",
+          ),
+          SIMULATED(),
         ],
         exit: 0,
       };
     }
     if (sub === "reload") {
-      return { output: ["配置已重新加载。", SIMULATED], exit: 0 };
+      return {
+        output: [t("Configuration reloaded.", "配置已重新加载。"), SIMULATED()],
+        exit: 0,
+      };
     }
     return { output: buildConfigToml().trimEnd().split("\n"), exit: 0 };
   }
 
   if (head === "export" || head === "set" || head === "unset") {
-    return { output: [`${head} ${rest}`.trim(), SIMULATED], exit: 0 };
+    return { output: [`${head} ${rest}`.trim(), SIMULATED()], exit: 0 };
   }
 
   if (head === "git") {
@@ -623,15 +792,32 @@ export function simulateCommand(
       };
     }
     if (sub === "diff") {
-      return { output: ["工作区干净，没有未暂存的改动。"], exit: 0 };
+      return {
+        output: [
+          t(
+            "Working tree clean, nothing unstaged.",
+            "工作区干净，没有未暂存的改动。",
+          ),
+        ],
+        exit: 0,
+      };
     }
     if (sub === "log") {
       return {
         output: [
-          "a31d48f (HEAD → master) feat: 候选菜单支持 Shift-Tab",
-          "80b2e19 perf: 历史按频率 + 新鲜度排序",
-          "e9255ab feat: 模块化提示符",
-          "72ac3b1 docs: 补上配置说明",
+          t(
+            "a31d48f (HEAD → master) feat: Shift-Tab in the candidate menu",
+            "a31d48f (HEAD → master) feat: 候选菜单支持 Shift-Tab",
+          ),
+          t(
+            "80b2e19 perf: rank history by frequency + recency",
+            "80b2e19 perf: 历史按频率 + 新鲜度排序",
+          ),
+          t("e9255ab feat: modular prompt", "e9255ab feat: 模块化提示符"),
+          t(
+            "72ac3b1 docs: document the configuration",
+            "72ac3b1 docs: 补上配置说明",
+          ),
           "1aaeb0d init: hello, commands",
         ],
         exit: 0,
@@ -645,7 +831,13 @@ export function simulateCommand(
       };
     }
     return {
-      output: [`Playground: git ${sub ?? ""} 不会改动任何真实仓库。`, SIMULATED],
+      output: [
+        `Playground: git ${sub ?? ""} ${t(
+          "does not touch any real repository.",
+          "不会改动任何真实仓库。",
+        )}`,
+        SIMULATED(),
+      ],
       exit: 0,
     };
   }
@@ -674,7 +866,7 @@ export function simulateCommand(
           "     Running unittests src/main.rs",
           "",
           "test result: ok. 99 passed; 0 failed; 0 ignored",
-          SIMULATED,
+          SIMULATED(),
         ],
         exit: 0,
       };
@@ -683,7 +875,7 @@ export function simulateCommand(
       output: [
         `   Compiling cmds v${BRAND.version}`,
         "    Finished `release` profile [optimized] target(s) in 24.71s",
-        SIMULATED,
+        SIMULATED(),
       ],
       exit: 0,
     };
@@ -699,7 +891,10 @@ export function simulateCommand(
           // 跟着 web/package.json 的 vite 版本走，升级依赖时记得同步
           "  VITE v8.3.0  ready in 148 ms",
           "  ➜  Local:   http://localhost:5173/",
-          "Playground 预览：no server process was started.",
+          t(
+            "Playground preview: no server process was started.",
+            "Playground 预览：没有启动任何服务进程。",
+          ),
         ],
         exit: 0,
       };
@@ -708,21 +903,38 @@ export function simulateCommand(
       return {
         output: [
           "✓ 32 modules transformed.",
+          t(
+          "Build demo finished; no files were written.",
           "构建演示完成，没有写入任何文件。",
+        ),
         ],
         exit: 0,
       };
     }
-    return { output: ["依赖已是最新，本机没有安装任何包。"], exit: 0 };
+    return {
+      output: [
+        t(
+          "Dependencies are up to date; nothing was installed locally.",
+          "依赖已是最新，本机没有安装任何包。",
+        ),
+      ],
+      exit: 0,
+    };
   }
 
   const suggestions = similarCommands(head, 3, { aliases, abbreviations });
   return {
     output: [
       suggestions.length
-        ? `cmds: ${head}：未找到命令，也许你想输入：${suggestions.join("、")}`
-        : `cmds: ${head}：未找到命令`,
-      "输入 help 查看全部内建命令，或安装 cmds 在本机执行真实命令。",
+        ? `cmds: ${head}${t(
+            ": command not found. Did you mean: ",
+            "：未找到命令，也许你想输入：",
+          )}${suggestions.join(t(", ", "、"))}`
+        : `cmds: ${head}${t(": command not found", "：未找到命令")}`,
+      t(
+        "Type help for every builtin, or install cmds to run real commands locally.",
+        "输入 help 查看全部内建命令，或安装 cmds 在本机执行真实命令。",
+      ),
     ],
     exit: 127,
   };

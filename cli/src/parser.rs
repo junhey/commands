@@ -223,7 +223,10 @@ pub fn tokenize(input: &str, vars: VarLookup<'_>) -> Result<Vec<Token>, SyntaxEr
                             end += 1;
                         }
                         None => {
-                            return Err(SyntaxError::new("单引号未闭合", true));
+                            return Err(SyntaxError::new(
+                                t!("unterminated single quote", "单引号未闭合"),
+                                true,
+                            ));
                         }
                     }
                 }
@@ -256,7 +259,12 @@ pub fn tokenize(input: &str, vars: VarLookup<'_>) -> Result<Vec<Token>, SyntaxEr
                                     literal.push(other);
                                     end += 2;
                                 }
-                                None => return Err(SyntaxError::new("双引号未闭合", true)),
+                                None => {
+                                    return Err(SyntaxError::new(
+                                        t!("unterminated double quote", "双引号未闭合"),
+                                        true,
+                                    ));
+                                }
                             }
                         }
                         Some('$') => {
@@ -268,7 +276,12 @@ pub fn tokenize(input: &str, vars: VarLookup<'_>) -> Result<Vec<Token>, SyntaxEr
                             literal.push(*c);
                             end += 1;
                         }
-                        None => return Err(SyntaxError::new("双引号未闭合", true)),
+                        None => {
+                            return Err(SyntaxError::new(
+                                t!("unterminated double quote", "双引号未闭合"),
+                                true,
+                            ));
+                        }
                     }
                 }
                 builder.push_quoted(&literal);
@@ -288,7 +301,15 @@ pub fn tokenize(input: &str, vars: VarLookup<'_>) -> Result<Vec<Token>, SyntaxEr
             }
             '\\' => match next {
                 // 行尾反斜杠：续行
-                None => return Err(SyntaxError::new("行尾反斜杠（续行）", true)),
+                None => {
+                    return Err(SyntaxError::new(
+                        t!(
+                            "trailing backslash (line continuation)",
+                            "行尾反斜杠（续行）"
+                        ),
+                        true,
+                    ));
+                }
                 Some('\n') => index += 2,
                 Some('\r') => {
                     index += if chars.get(index + 2) == Some(&'\n') {
@@ -399,7 +420,13 @@ impl<'a> Parser<'a> {
                     if op == ChainOp::Seq {
                         break;
                     }
-                    return Err(SyntaxError::new("逻辑操作符后缺少命令", true));
+                    return Err(SyntaxError::new(
+                        t!(
+                            "missing command after a logical operator",
+                            "逻辑操作符后缺少命令"
+                        ),
+                        true,
+                    ));
                 }
             }
         }
@@ -416,7 +443,10 @@ impl<'a> Parser<'a> {
                     if commands.is_empty() {
                         return Ok(None);
                     }
-                    return Err(SyntaxError::new("管道后缺少命令", true));
+                    return Err(SyntaxError::new(
+                        t!("missing command after a pipe", "管道后缺少命令"),
+                        true,
+                    ));
                 }
             }
             match self.peek() {
@@ -451,12 +481,13 @@ impl<'a> Parser<'a> {
                         append: *append,
                     };
                     self.position += 1;
-                    let target = self.expect_target("重定向目标")?;
+                    let target = self.expect_target(t!("a redirection target", "重定向目标"))?;
                     command.redirects.push(Redirect { kind, target });
                 }
                 Some(Token::RedirIn) => {
                     self.position += 1;
-                    let target = self.expect_target("输入重定向目标")?;
+                    let target =
+                        self.expect_target(t!("an input redirection target", "输入重定向目标"))?;
                     command.redirects.push(Redirect {
                         kind: RedirectKind::In,
                         target,
@@ -479,7 +510,7 @@ impl<'a> Parser<'a> {
                 self.position += 1;
                 Ok(text)
             }
-            _ => Err(SyntaxError::new(format!("缺少{what}"), true)),
+            _ => Err(SyntaxError::new(tf!("missing {what}", "缺少{what}"), true)),
         }
     }
 }
@@ -493,7 +524,11 @@ pub fn parse(tokens: &[Token]) -> Result<Option<Node>, SyntaxError> {
     let node = parser.parse_node()?;
     if parser.position < tokens.len() {
         return Err(SyntaxError::new(
-            format!("无法解析的输入（第 {} 个 token 附近）", parser.position + 1),
+            tf!(
+                "cannot parse the input (near token {})",
+                "无法解析的输入（第 {} 个 token 附近）",
+                parser.position + 1
+            ),
             false,
         ));
     }

@@ -140,6 +140,22 @@ gcm = "git commit -m"
 
 Startup script: `~/.cmdsrc` (or `~/.config/cmds/init.cmds`) may contain any cmds commands.
 
+## Language
+
+Everything — the CLI, the installer, the config template and the website — is **English by
+default**. Chinese appears only when your environment asks for it, using the usual POSIX
+precedence: `CMDS_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`. A locale starting with `zh`
+selects Chinese; `C`, `POSIX`, anything else and unset all mean English.
+
+```sh
+cmds                         # follows your locale
+CMDS_LANG=zh cmds            # force Chinese
+CMDS_LANG=en cmds            # force English on a Chinese system
+CMDS_LANG=en sh install.sh   # the installer honours the same variable
+```
+
+The website follows your browser language and has a switch in the sidebar.
+
 ## Command-line usage
 
 ```sh
@@ -220,7 +236,7 @@ docs/               additional documentation
 
 ```sh
 # CLI
-cargo test                    # 99 unit tests
+cargo test                    # 109 unit tests
 cargo build --release --locked
 cargo run -- -c "echo hello"
 
@@ -229,12 +245,20 @@ cd web && npm install
 npm run dev                   # dev server, also serves /install.sh
 npm test                      # Playground core tests
 npm run build                 # static output in web/dist
+
+# Default language (English everywhere unless the locale says otherwise)
+sh scripts/check-cli-language.sh              # runs the real binary and install.sh
+node scripts/check-web-language.mjs web/src/*.js web/src/*.jsx
 ```
 
 `web/src/commands.js` deliberately mirrors several CLI rules (the builtin list, candidate ranking,
 the suggestion algorithm, history weighting), so a change on one side needs the same change on the
 other. Details in
 [CONTRIBUTING.md](https://github.com/junhey/commands/blob/master/CONTRIBUTING.md).
+
+Further reading:
+[architecture](https://github.com/junhey/commands/blob/master/docs/architecture.md) ·
+[deployment](https://github.com/junhey/commands/blob/master/docs/deployment.md)
 
 ## Privacy
 

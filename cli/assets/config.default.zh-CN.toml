@@ -1,16 +1,15 @@
-# Commands (cmds) configuration
-# Location: ~/.config/cmds/config.toml (Windows: %APPDATA%\cmds\config.toml)
-# Every key is optional; omitting one keeps its default. Changes take effect
-# immediately — the next prompt re-reads this file.
+# Commands (cmds) 配置文件
+# 位置：~/.config/cmds/config.toml（Windows：%APPDATA%\cmds\config.toml）
+# 所有键都可省略，省略即使用默认值。改完立即生效（新开的提示符会重新读取）。
 
-# ── Prompt ──────────────────────────────────────────────────────────────
-# $module placeholders are replaced by that module's output; $line_break is a newline.
+# ── 提示符 ─────────────────────────────────────────────────────────────
+# $module 占位符会被对应模块的输出替换；$line_break 表示换行。
 format = "$identity$dir$git_branch$git_status$languages$cmd_duration$status$line_break$character"
-# Right-hand prompt, drawn at the end of the same line, e.g. "$time"
+# 右侧提示符（写在同一行的右端），例如 "$time"
 right_format = ""
-# Leave a blank line before each prompt; gives the output room to breathe
+# 每次提示符前空一行，视觉上更松快
 add_newline = true
-# Continuation marker for multi-line input (unclosed quote or pipe)
+# 多行输入（引号/管道未闭合）时的续行提示
 continuation_symbol = "∙ "
 continuation_style = "dimmed yellow"
 
@@ -22,19 +21,19 @@ error_style = "bold red"
 
 [dir]
 style = "bold cyan"
-# Keep the last N path segments; 0 disables truncation
+# 保留最后 N 级目录，0 表示不截断
 truncation_length = 3
 truncation_symbol = "…/"
-# Inside a git repository, start the path at the repo root
+# 在 git 仓库内时，从仓库根开始显示
 truncate_to_repo = true
 home_symbol = "~"
 
 [git]
 enabled = true
-# Empty by default so any font works; with a Nerd Font try " "
+# 默认留空以兼容任意字体；装了 Nerd Font 可以改成 " "
 branch_symbol = ""
 branch_style = "bold purple"
-# Turn this off to avoid running `git status` in huge repositories
+# 关闭可以避免大仓库里执行 `git status`
 status_enabled = true
 status_style = "bold red"
 detached_symbol = "@"
@@ -43,7 +42,7 @@ detached_symbol = "@"
 enabled = true
 show_version = true
 
-# Each language can override symbol / style / enabled / files / extensions / version_cmd
+# 每种语言都可以单独覆盖 symbol / style / enabled / files / extensions / version_cmd
 [languages.rust]
 symbol = "🦀 "
 style = "bold red"
@@ -66,7 +65,7 @@ style = "bold blue"
 
 [cmd_duration]
 enabled = true
-# Only show the duration once a command takes longer than this
+# 超过这个毫秒数才显示耗时
 min_time_ms = 2000
 style = "bold yellow"
 prefix = "took "
@@ -79,7 +78,7 @@ symbol = "✘ "
 [time]
 enabled = false
 style = "dimmed white"
-# Hour offset from UTC; use 8 for UTC+8
+# 与 UTC 的小时偏移，东八区填 8
 utc_offset = 0
 show_seconds = false
 
@@ -88,32 +87,32 @@ show_user = false
 show_host = false
 style = "bold dimmed green"
 
-# ── Input (fish flavour) ────────────────────────────────────────────────
+# ── 输入体验（fish 风味）─────────────────────────────────────────────
 [autosuggest]
-# Grey history suggestion as you type; → / End / Ctrl-F takes it
+# 边打字边给出灰色的历史建议，→ / End / Ctrl-F 一键采纳
 enabled = true
 style = "dimmed"
-# Order of suggestion sources: history, then completion (commands and paths)
+# 建议来源顺序：history（历史）、completion（命令与路径补全）
 sources = ["history", "completion"]
 
 [menu]
-# Tab opens the candidate menu; ↑/↓ selects, Enter accepts, Esc closes
+# Tab 弹出候选菜单，↑/↓ 选择，Enter 采纳，Esc 关闭
 enabled = true
 max_rows = 8
 max_candidates = 200
 show_descriptions = true
-# When several candidates share a prefix, insert that prefix first
+# 多个候选有公共前缀时先补齐公共部分
 auto_insert_common_prefix = true
 selected_style = "bold fg:black bg:cyan"
 description_style = "dimmed"
 hint_style = "dimmed italic"
 
 [history]
-# Defaults to ~/.local/share/cmds/history (Windows: %LOCALAPPDATA%\cmds\history)
+# 默认 ~/.local/share/cmds/history（Windows：%LOCALAPPDATA%\cmds\history）
 # file = "~/.cmds_history"
 max_entries = 20000
 dedup = true
-# Commands starting with a space are not recorded
+# 以空格开头的命令不写入历史
 ignore_space = true
 ignore_commands = ["exit", "clear"]
 
@@ -127,7 +126,7 @@ variable = "cyan"
 option = "bold blue"
 comment = "dimmed"
 
-# ── Aliases / abbreviations / environment ───────────────────────────────
+# ── 别名 / 缩写 / 环境变量 ───────────────────────────────────────────
 [aliases]
 ll = "ls -lah"
 la = "ls -A"
@@ -135,7 +134,7 @@ gs = "git status"
 gd = "git diff"
 gl = "git log --oneline --graph --decorate -20"
 
-# Abbreviations expand to the full command as soon as you press space (fish's abbr)
+# 缩写：输入后按空格立即展开成完整命令（fish 的 abbr）
 [abbreviations]
 gco = "git checkout"
 gcm = "git commit -m"

@@ -1,5 +1,10 @@
 //! cmds —— Commands：轻量高效的交互式终端。
 
+// i18n 必须第一个声明：`#[macro_use]` 导出的 t! / tf! 只对**之后**声明的模块可见，
+// 放在中间的话前面的模块会报 "cannot find macro"。
+#[macro_use]
+mod i18n;
+
 mod builtins;
 mod config;
 mod editor;
@@ -29,7 +34,10 @@ fn dispatch(args: &[String]) -> i32 {
         None | Some("-i") => interactive(),
         Some("-c") => {
             if args.len() < 2 {
-                eprintln!("cmds: -c 需要一个命令");
+                eprintln!(
+                    "{}",
+                    t!("cmds: -c needs a command", "cmds: -c 需要一个命令")
+                );
                 return 2;
             }
             command_mode(&args[1..].join(" "))
@@ -47,7 +55,13 @@ fn dispatch(args: &[String]) -> i32 {
         }
         Some(path) if !path.starts_with('-') => script_mode(path, &args[1..]),
         Some(other) => {
-            eprintln!("cmds: 无法识别的参数 `{other}`");
+            eprintln!(
+                "{}",
+                tf!(
+                    "cmds: unrecognized argument `{other}`",
+                    "cmds: 无法识别的参数 `{other}`"
+                )
+            );
             print_usage();
             2
         }
@@ -135,7 +149,13 @@ fn prompt_mode(args: &[String]) -> i32 {
                 index += 2;
             }
             other => {
-                eprintln!("cmds prompt: 无法识别的参数 `{other}`");
+                eprintln!(
+                    "{}",
+                    tf!(
+                        "cmds prompt: unrecognized argument `{other}`",
+                        "cmds prompt: 无法识别的参数 `{other}`"
+                    )
+                );
                 return 2;
             }
         }
@@ -166,8 +186,12 @@ fn prompt_mode(args: &[String]) -> i32 {
 fn init_mode(args: &[String]) -> i32 {
     let Some(target) = args.first() else {
         eprintln!(
-            "cmds init: 需要指定 shell（{}）",
-            integration::SUPPORTED.join(" / ")
+            "{}",
+            tf!(
+                "cmds init: needs a shell ({})",
+                "cmds init: 需要指定 shell（{}）",
+                integration::SUPPORTED.join(" / ")
+            )
         );
         return 2;
     };
@@ -178,8 +202,12 @@ fn init_mode(args: &[String]) -> i32 {
         }
         None => {
             eprintln!(
-                "cmds init: 暂不支持 `{target}`，可用：{}",
-                integration::SUPPORTED.join(" / ")
+                "{}",
+                tf!(
+                    "cmds init: `{target}` is not supported yet; available: {}",
+                    "cmds init: 暂不支持 `{target}`，可用：{}",
+                    integration::SUPPORTED.join(" / ")
+                )
             );
             2
         }
@@ -201,25 +229,50 @@ fn config_mode(args: &[String]) -> i32 {
 
 fn print_usage() {
     println!(
-        r#"cmds {VERSION} — 轻量高效的交互式终端
+        "{}",
+        tf!(
+            r#"cmds {} — a small, fast interactive shell
+
+Usage:
+  cmds                          start the interactive shell
+  cmds -c "<command>"           run one command and exit
+  cmds <script> [args...]       run a script ($1, $2 available inside)
+  cmds prompt [options]         print the prompt, for use by other shells
+      --status <N>    exit code of the previous command
+      --duration <MS> how long the previous command took
+      --jobs <N>      number of background jobs
+      --shell <bash|zsh|fish|plain>
+  cmds init <bash|zsh|fish|powershell>
+                                print the integration snippet, e.g. eval "$(cmds init bash)"
+  cmds config [path|init|reload|show]
+                                show or create the config file
+  cmds --version                print the version
+  cmds --help                   print this help
+
+Type `help` inside the shell for every keybinding.
+Docs: https://junhey.github.io/commands/#guide"#,
+            r#"cmds {} — 轻量高效的交互式终端
 
 用法：
   cmds                          启动交互式 shell
   cmds -c "<命令>"               执行一条命令后退出
   cmds <脚本> [参数...]          执行脚本（脚本内可用 $1、$2）
   cmds prompt [选项]            输出提示符，供其它 shell 使用
-      --status <N>  上一条命令退出码
+      --status <N>    上一条命令退出码
       --duration <MS> 上一条命令耗时（毫秒）
-      --jobs <N>    后台任务数量
+      --jobs <N>      后台任务数量
       --shell <bash|zsh|fish|plain>
   cmds init <bash|zsh|fish|powershell>
-                               输出集成脚本，例如：eval "$(cmds init bash)"
+                                输出集成脚本，例如：eval "$(cmds init bash)"
   cmds config [path|init|reload|show]
-                               查看/生成配置文件
+                                查看/生成配置文件
   cmds --version                查看版本
   cmds --help                   查看本帮助
 
-交互式下输入 `help` 可查看全部快捷键。文档：https://junhey.github.io/commands/#guide"#
+交互式下输入 `help` 可查看全部快捷键。
+文档：https://junhey.github.io/commands/#guide"#,
+            VERSION
+        )
     );
 }
 

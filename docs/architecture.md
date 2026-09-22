@@ -1,120 +1,144 @@
-# 架构说明
+# Architecture
 
-## 一句话
+> 中文版：[docs/architecture.zh-CN.md](https://github.com/junhey/commands/blob/master/docs/architecture.zh-CN.md)
 
-`cli/` 是产品本体，`web/` 是它的官网、Playground 与安装入口，`install/` 是两者之间的桥。
+## In one sentence
 
-```
-                     ┌───────────────────────────┐
-  用户在浏览器试用 ──▶│ web/  官网 + Playground   │
-                     │  · 模拟终端（规则对齐 CLI）│
-                     │  · Config 页生成 TOML     │
-                     │  · 安装对话框             │
-                     └─────────────┬─────────────┘
-                                   │ 站点根目录提供
-                                   ▼
-                     ┌───────────────────────────┐
-                     │ install/  install.sh/.ps1 │
-                     │  · 识别平台               │
-                     │  · 下载 Release + 校验    │
-                     │  · 回退 cargo 构建        │
-                     └─────────────┬─────────────┘
-                                   ▼
-                     ┌───────────────────────────┐
-  用户在本机使用 ───▶│ cli/  cmds 二进制         │
-                     │  · 交互式 shell           │
-                     │  · 模块化提示符           │
-                     └───────────────────────────┘
-```
-
-## CLI（`cli/`）
+`cli/` is the product, `web/` is its website, Playground and install entry point, and `install/`
+is the bridge between them.
 
 ```
-main.rs        参数分发：交互 / -c / 脚本 / prompt / init / config
-shell.rs       Shell 运行时状态 + 交互式 REPL 主循环
-editor/        行编辑器
-  mod.rs         按键处理、渲染调度
-  suggest.rs     历史 ghost 建议
-  complete.rs    候选生成与排序
-  highlight.rs   语法高亮
-  render.rs      宽度计算、折行、菜单绘制
-prompt/        模块化提示符（dir / git / 语言 / 耗时 / 状态…）
-exec.rs        管道、重定向、逻辑连接、后台任务
-parser.rs      词法与语法分析
-builtins.rs    21 个内建命令
-history.rs     历史存储与排序（频率 + 新鲜度）
-config/        TOML 解析与配置结构
-glob.rs        轻量通配符
-style.rs       样式描述 → ANSI
-util.rs        路径、环境变量、PATH 查找、编辑距离
+                      ┌───────────────────────────┐
+  try it in a browser │ web/  site + Playground   │
+        ─────────────▶│  · simulated terminal     │
+                      │  · Config page → TOML     │
+                      │  · install dialog         │
+                      └─────────────┬─────────────┘
+                                    │ served from the site root
+                                    ▼
+                      ┌───────────────────────────┐
+                      │ install/  install.sh/.ps1 │
+                      │  · detect the platform    │
+                      │  · download + verify      │
+                      │  · fall back to cargo     │
+                      └─────────────┬─────────────┘
+                                    ▼
+                      ┌───────────────────────────┐
+  run it locally ────▶│ cli/  the cmds binary     │
+                      │  · interactive shell      │
+                      │  · modular prompt         │
+                      └───────────────────────────┘
 ```
 
-几个设计取舍：
-
-- **采纳 ≠ 执行。** 候选菜单里按 `Enter` 只把候选填进输入行，需要再按一次
-  `Enter` 才执行。这是刻意的安全设计，避免误触跑掉危险命令。
-- **PATH 缓存 30 秒。** 每次补全都扫一遍 PATH 太慢，`Shell::path_commands()`
-  带 30 秒缓存。
-- **拼写建议按类型分层。** 见下节。
-- **不做脚本语法。** 没有函数、`if/for`。定位是交互，不是 sh 的替代品。
-
-## 站点（`web/`）
+## CLI (`cli/`)
 
 ```
-src/commands.js   Playground 内核：内建清单、候选排序、模拟执行、配置生成
-src/install.js    安装命令生成（origin + base 推导）
-src/App.jsx       全部页面与交互
-src/styles.css    样式
-tests/            内核与安装地址的单元测试（node:test，无需浏览器）
+main.rs        argument dispatch: interactive / -c / script / prompt / init / config
+shell.rs       shell runtime state + the interactive REPL loop
+editor/        line editor
+  mod.rs         key handling, render scheduling
+  suggest.rs     ghost suggestions from history
+  complete.rs    candidate generation and ranking
+  highlight.rs   syntax highlighting
+  render.rs      width calculation, wrapping, menu drawing
+prompt/        modular prompt (dir / git / languages / duration / status …)
+exec.rs        pipes, redirection, logical operators, background jobs
+parser.rs      lexing and parsing
+builtins.rs    21 builtin commands
+history.rs     history storage and ranking (frequency + recency)
+config/        TOML parsing and config structures
+glob.rs        lightweight globbing
+i18n.rs        interface language (English by default)
+style.rs       style descriptions → ANSI
+util.rs        paths, environment variables, PATH lookup, edit distance
 ```
 
-- **纯静态。** hash 路由（`#config`、`#guide`），不需要服务端 rewrite。
-- **无后端。** 历史、片段、偏好都在 localStorage，隐私模式下写入失败会静默降级，当次会话仍可用。
-- **Playground 完全模拟。** `simulateCommand` 只做查表与字符串处理，
-  不执行代码、不读文件、不发请求。输出里会明确标注「模拟输出」。
-- **安装地址运行时推导。** `installMethods(origin, base)` 从
-  `window.location.origin` 与 `import.meta.env.BASE_URL` 拼地址，
-  换域名或换部署路径都不用改代码，也不会出现虚构的域名。
-- **安装脚本不复制。** Vite 插件 `cmds-install-scripts` 直接读
-  `install/` 下的源文件，开发服务器和构建产物都是同一份，不存在副本过期问题。
+A few deliberate trade-offs:
 
-## 两侧刻意保持一致的规则
+- **Accepting is not running.** `Enter` in the candidate menu only fills the line; a second
+  `Enter` runs it. This is a safety decision — a stray keypress should not fire off a
+  destructive command.
+- **PATH is cached for 30 seconds.** Scanning PATH on every completion is too slow, so
+  `Shell::path_commands()` caches for 30 seconds.
+- **Spelling suggestions are ranked by category.** See below.
+- **No scripting syntax.** No functions, no `if` / `for`. This targets interactive use and is
+  not a replacement for sh.
+- **English by default.** `i18n.rs` picks a language once per process from `CMDS_LANG` >
+  `LC_ALL` > `LC_MESSAGES` > `LANG`. Both languages are written on the same line via
+  `t!(en, zh)` — no gettext, no resource files shipped next to the binary. The text volume is
+  small, and having both languages in front of you is the best defence against updating only one
+  of them.
 
-网站的价值在于「先试后装」，所以 Playground 的手感必须和真实 CLI 一致。
-以下规则在两边各实现一次，并各有测试守着：
+## Website (`web/`)
 
-| 规则 | Rust | JS |
+```
+src/commands.js   Playground core: builtin list, ranking, simulated execution, config generation
+src/install.js    install command generation (derived from origin + base)
+src/i18n.js       interface language, mirrors cli/src/i18n.rs
+src/App.jsx       every page and interaction
+src/styles.css    styles
+tests/            unit tests for the core and install URLs (node:test, no browser needed)
+```
+
+- **Fully static.** Hash routing (`#config`, `#guide`), so no server-side rewrite is needed.
+- **No backend.** History, snippets and preferences live in localStorage; if writing fails in
+  private mode it degrades silently and the current session still works.
+- **The Playground is entirely simulated.** `simulateCommand` only does table lookups and string
+  handling — no code execution, no file reads, no requests. Output is explicitly labelled as
+  simulated.
+- **Install URLs are derived at runtime.** `installMethods(origin, base)` builds them from
+  `window.location.origin` and `import.meta.env.BASE_URL`, so changing domain or deploy path
+  needs no code change and no fictional domain ever appears.
+- **Install scripts are not copied.** The `cmds-install-scripts` Vite plugin reads the files in
+  `install/` directly, so the dev server and the build output serve the same source and copies
+  cannot go stale.
+
+## Rules kept deliberately identical on both sides
+
+The point of the website is "try before you install", so the Playground has to feel like the real
+CLI. These rules are implemented once on each side, each with tests guarding them:
+
+| Rule | Rust | JS |
 | --- | --- | --- |
-| 内建命令清单 | `builtins.rs` 的 `BUILTINS` | `commands.js` 的 `builtins` |
-| 编辑距离 | `util.rs` 的 `levenshtein` | `levenshtein` |
-| 拼写建议排序 | `shell.rs` 的 `similar_commands` | `similarCommands` |
-| 历史排序 | 频率 + 新鲜度 | `getSuggestions` 的 `weight` |
-| ghost 建议 | `editor/suggest.rs` | `ghostSuggestion` |
-| 配置模板 | `config/mod.rs` 的默认模板 | `buildConfigToml` |
+| Builtin command list | `BUILTINS` in `builtins.rs` | `builtins` in `commands.js` |
+| Edit distance | `levenshtein` in `util.rs` | `levenshtein` |
+| Spelling suggestion ranking | `similar_commands` in `shell.rs` | `similarCommands` |
+| History ranking | frequency + recency | `weight` in `getSuggestions` |
+| Ghost suggestions | `editor/suggest.rs` | `ghostSuggestion` |
+| Config template | default template in `config/mod.rs` | `buildConfigToml` |
+| Interface language | `i18n.rs` (`t!` / `tf!`) | `i18n.js` (`t`) |
 
-### 拼写建议的排序规则
+### How spelling suggestions are ranked
 
 ```
-编辑距离 → 候选类型（内建 0 > 别名/缩写 1 > PATH 2）
-        → 首字母是否相同 → 长度差 → 字典序
+edit distance → candidate category (builtin 0 > alias/abbr 1 > PATH 2)
+              → same first letter → length difference → lexicographic
 ```
 
-只按「距离 + 字典序」排是不够的：输入 `hepl` 时，PATH 上的 `h2ph`、`head`、
-`heap` 与内建 `help` 编辑距离都是 2，字典序还排在 `help` 前面，于是
-`limit = 3` 时真正想要的 `help` 被挤出去了。把候选类型提到第二位就解决了——
-内建命令和用户自己定义的别名，本来就比 PATH 上的随机同分命令更可能是意图。
+Ranking by "distance + lexicographic" alone is not enough. Typing `hepl` gives the PATH commands
+`h2ph`, `head` and `heap` the same edit distance of 2 as the builtin `help`, and they sort before
+it lexicographically — so with `limit = 3` the one you actually wanted got pushed out. Promoting
+the category to second place fixes it: builtins and the aliases you defined yourself are
+inherently more likely to be what you meant than a random PATH command with the same score.
 
-`cli/src/shell.rs` 与 `web/tests/commands.test.js` 都有对应的回归测试。
+Both `cli/src/shell.rs` and `web/tests/commands.test.js` have regression tests for this.
 
-## 测试策略
+## Testing strategy
 
-| 范围 | 工具 | 数量 |
+| Scope | Tool | Count |
 | --- | --- | --- |
-| CLI | `cargo test`（单元测试内嵌在各模块） | 99 |
-| Playground 内核 | `node --test` | 40 |
-| 安装脚本 | `sh -n` + shellcheck + PowerShell Parser | 语法级 |
-| 端到端 | CI 里三平台跑 `--version` / `-c` / `init` / `prompt` 冒烟 | — |
+| CLI | `cargo test` (unit tests inline in each module) | 109 |
+| Playground core | `node --test` | 42 |
+| Install scripts | `sh -n` + shellcheck + PowerShell Parser | syntax level |
+| Default language | `scripts/check-cli-language.sh`, `scripts/check-web-language.mjs` | behavioural + AST |
+| End to end | CI smoke-tests `--version` / `-c` / `init` / `prompt` on three platforms | — |
 
-**并行测试的坑：** `cd` 内建的测试会调用 `std::env::set_current_dir`，这是
-进程级副作用。任何依赖相对路径的测试都必须自建临时目录并直接设置
-`shell.cwd`，否则会随机失败。CI 里额外跑一次 `--test-threads=1` 做交叉验证。
+**The parallel-test trap:** the `cd` builtin's tests call `std::env::set_current_dir`, which is a
+process-wide side effect. Any test that depends on relative paths must create its own temporary
+directory and set `shell.cwd` directly, otherwise it fails at random. CI additionally runs
+`--test-threads=1` as a cross-check.
+
+**Why the language checks run real processes:** asserting only "no Chinese in an English
+environment" can be satisfied by deleting all the Chinese, which is not internationalisation.
+`check-cli-language.sh` therefore also asserts that a Chinese environment still produces Chinese,
+so neither direction can rot unnoticed.
