@@ -90,8 +90,8 @@ git push origin v0.2.0
 产出六个平台的包，命名必须与安装脚本里拼出的一致：
 
 ```
-cmds-x86_64-unknown-linux-gnu.tar.gz    (+ .sha256)
-cmds-aarch64-unknown-linux-gnu.tar.gz   (+ .sha256)
+cmds-x86_64-unknown-linux-musl.tar.gz   (+ .sha256)
+cmds-aarch64-unknown-linux-musl.tar.gz  (+ .sha256)
 cmds-x86_64-apple-darwin.tar.gz         (+ .sha256)
 cmds-aarch64-apple-darwin.tar.gz        (+ .sha256)
 cmds-x86_64-pc-windows-msvc.zip         (+ .sha256)
@@ -101,6 +101,28 @@ SHA256SUMS
 
 > 改动 `install.sh` 里的 `BIN` / `REPO`，或改动 Release 工作流里的包名时，
 > **两边必须同时改**，否则一键安装会 404 后静默退化成 `cargo` 源码构建。
+
+### Linux 必须保持 musl
+
+**不要把 Linux 目标改回 `-gnu`。** 动态链接的产物会把**构建机**的 glibc 版本写进
+ELF 的版本需求。`ubuntu-latest` 是 24.04（glibc 2.39），产物于是要求 `GLIBC_2.39`，
+在 Debian 10/11、Ubuntu 18.04~22.04、CentOS 7/8 和大多数开发容器上直接报错：
+
+```
+cmds: /lib64/libc.so.6: version `GLIBC_2.29' not found (required by cmds)
+```
+
+CI 自己测不出这个问题——因为 CI 就跑在构建机上。所以有
+`scripts/check-linux-portability.sh`：先断言产物是静态、无 glibc 引用，
+再在 `debian:10`、`centos:7`、`alpine` 里真的把它跑起来。
+
+能这么做的前提是 cmds 没有任何 C 依赖：crossterm、unicode-width、libc 全是纯 Rust，
+libc 只用到 `signal()`，用户名取自环境变量而不是 NSS 查询。所以不存在静态 musl 的
+NSS 陷阱，用 `rust-lld` 配 rustup 自带的 musl std 就够——不需要 `musl-tools`，
+也不需要交叉工具链。
+
+`install.sh` 会先试 musl、失败回退 gnu，这样 `--version v0.2.0` 这类指定旧版本的
+安装仍能匹配到那些 Release 实际发布的资产名。
 
 没有 Release 时安装脚本仍可用：取不到预编译包会自动回退到
 `cargo install --locked --git ...`，只是首次安装慢一些。

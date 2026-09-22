@@ -27,12 +27,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
+          # Linux 用 musl 静态链接，不是 gnu。
+          #
+          # 动态链接 glibc 的二进制会把**构建机**的 glibc 版本写进 ELF 的版本需求里。
+          # ubuntu-latest 是 24.04（glibc 2.39），产物于是要求 GLIBC_2.39，在
+          # Debian 10/11、Ubuntu 18.04~22.04、CentOS 7/8、各种开发容器上一律
+          # 报 `version GLIBC_2.xx not found` 直接跑不起来——等于只有最新 Ubuntu 能用。
+          #
+          # musl 静态链接彻底绕开这个问题：产物零动态依赖，任何 Linux 都能跑。
+          # 这里能这么干的前提是 cmds 没有任何 C 依赖（crossterm / unicode-width /
+          # libc 全是纯 Rust，libc 只用到 signal()），用户名也只读环境变量而不查 NSS，
+          # 所以不存在静态 musl 的 NSS 陷阱。
+          - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-          - target: aarch64-unknown-linux-gnu
+          - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-            linker: aarch64-linux-gnu-gcc
-            apt: gcc-aarch64-linux-gnu
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: aarch64-apple-darwin
@@ -53,20 +62,28 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: 安装交叉编译链接器
-        if: matrix.apt != ''
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ${{ matrix.apt }}
-
       - name: 构建
         shell: bash
         run: |
-          if [ -n "${{ matrix.linker }}" ]; then
+          set -euo pipefail
+          # musl 目标用 rust-lld 链接：rustup 自带的 musl std 已经包含 libc.a 与 crt 对象，
+          # 而项目里没有任何 C 代码要编译，所以既不需要 musl-tools，也不需要
+          # gcc-aarch64-linux-gnu——连交叉工具链都省了，aarch64 也能直接出静态产物。
+          if [[ "${{ matrix.target }}" == *musl* ]]; then
             target_env=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
-            export "CARGO_TARGET_${target_env}_LINKER=${{ matrix.linker }}"
+            export "CARGO_TARGET_${target_env}_LINKER=rust-lld"
           fi
           cargo build --release --locked --target ${{ matrix.target }}
+
+      # 这次 bug 的直接产物：v0.2.0 的 Linux 包要求 GLIBC_2.39，装完就
+      # `version GLIBC_2.29 not found`。发版前就地断言，不让坏产物流出去。
+      # 复用和 CI 同一个脚本，避免两处逻辑改漏。
+      #
+      # aarch64 产物在 x86 runner 上跑不起来，脚本只做静态断言那一层；
+      # x86_64 的容器实跑由 CI 的 portability job 负责。
+      - name: Linux 产物必须是静态、无 glibc 依赖
+        if: contains(matrix.target, 'linux')
+        run: sh scripts/check-linux-portability.sh "target/${{ matrix.target }}/release/cmds"
 
       - name: 打包并计算校验值
         shell: bash
