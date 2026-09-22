@@ -123,15 +123,27 @@ io.err(tf!("cannot read {}", "无法读取 {}", path));
 - **刻意的双语数据表**（如 `[名称, 英文说明, 中文说明]`）用
   `i18n-pairs-begin` / `i18n-pairs-end` 注释标出范围，检查脚本会跳过。
 
-CI 有两道检查，本地也可以跑：
+CI 有三道检查，本地也可以跑：
 
 ```sh
-sh scripts/check-cli-language.sh              # 跑真实进程：英文环境无中文，中文环境仍有中文
+sh scripts/check-cli-language.sh              # 跑真实二进制：英文环境无中文，中文环境仍有中文
+sh scripts/check-install-language.sh          # 安装脚本，不需要先构建
 node scripts/check-web-language.mjs web/src/*.js web/src/*.jsx   # AST 找裸中文
 ```
 
-`check-cli-language.sh` 刻意**双向**断言：只查「英文环境没有中文」的话，把中文全删了
-也能过，那不是国际化。
+两条设计原则，都是被真实故障逼出来的，改这些脚本时请保留：
+
+1. **双向断言。** 只查「英文环境没有中文」的话，把中文全删了也能过——那不是
+   国际化，是砍功能。所以同时断言「中文环境下中文必须还在」。
+2. **检测器自己要先自检。** 检测器坏掉比漏检更糟：会给出「通过」的假绿。
+   `scripts/cjk.sh` 在被引用时会用一个正例 + 一个反例验自己，不对就以退出码 2
+   拒绝给出结论。
+
+具体踩过的：**不要用 `grep '[一-龥]'` 判断中文。** 字符区间受 collation 影响，
+在 `LC_ALL=C` 下 GNU grep 直接报 `Invalid collation character` 并以错误码退出，
+于是所有断言恒为假、CI 全绿而实际什么都没查。macOS 的 BSD grep 恰好能跑，本地
+看不出来。现在统一用 `scripts/cjk.sh` 里的 `has_cjk`（Perl 的 `\p{Han}`，
+与 locale 无关，也不会像手写区间那样漏掉扩展区）。
 
 ## 定位边界
 

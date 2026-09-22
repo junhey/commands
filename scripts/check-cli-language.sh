@@ -7,7 +7,10 @@
 #   2. 中文环境（LANG=zh_CN.UTF-8）下，中文必须还在。
 #
 # 只查方向 1 的话，把所有中文删掉就能「通过」——那不是国际化，是砍功能。
-# 方向 2 把这条路堵死。
+# 方向 2 把这条路堵死。（这个双向设计当场救过一次：grep 在 C locale 下对中文
+# 区间报错、恒为假，方向 1 全部「通过」，是方向 2 报红才暴露出来的。）
+#
+# 安装脚本的语言检查在 scripts/check-install-language.sh，不需要二进制，单独跑。
 #
 # 用法：scripts/check-cli-language.sh [cmds 可执行文件路径]
 # 默认用 workspace 的 target/debug/cmds（注意是仓库根的 target/，不是 cli/target/）。
@@ -15,15 +18,17 @@
 set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+# shellcheck source=scripts/cjk.sh
+. "$ROOT/scripts/cjk.sh"
+
 BIN=${1:-"$ROOT/target/debug/cmds"}
 
 if [ ! -x "$BIN" ]; then
 	echo "找不到可执行文件：$BIN" >&2
-	echo "先运行：cargo build --manifest-path cli/Cargo.toml" >&2
+	echo "先运行：cargo build" >&2
 	exit 2
 fi
 
-CJK='[一-龥]'
 failures=0
 
 # 英文环境：清掉全部 locale 变量，再把 LC_ALL 钉成 C。
@@ -45,16 +50,16 @@ expect_en() {
 	desc=$1
 	shift
 	out=$(en "$BIN" "$@")
-	if printf '%s' "$out" | grep -q "$CJK"; then
-		fail "$desc：英文环境下出现中文 → $(printf '%s' "$out" | grep -m1 "$CJK" | cut -c1-90)"
+	if has_cjk "$out"; then
+		fail "$desc：英文环境下出现中文 → $(first_cjk_line "$out")"
 	fi
 }
 
-# expect_en_c <描述> <命令串> —— 同上，走 -c
+# expect_en_c <命令串> —— 同上，走 -c
 expect_en_c() {
 	out=$(en "$BIN" -c "$1")
-	if printf '%s' "$out" | grep -q "$CJK"; then
-		fail "-c '$1'：英文环境下出现中文 → $(printf '%s' "$out" | grep -m1 "$CJK" | cut -c1-90)"
+	if has_cjk "$out"; then
+		fail "-c '$1'：英文环境下出现中文 → $(first_cjk_line "$out")"
 	fi
 }
 
@@ -97,50 +102,43 @@ done
 echo "英文环境：检查配置模板"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-if printf '%s' "$(env -u LANG -u LC_MESSAGES -u LC_CTYPE -u CMDS_LANG LC_ALL=C CMDS_CONFIG="$tmp/en.toml" "$BIN" -c 'config init' 2>&1)" | grep -q "$CJK"; then
+
+out=$(env -u LANG -u LC_MESSAGES -u LC_CTYPE -u CMDS_LANG LC_ALL=C \
+	CMDS_CONFIG="$tmp/en.toml" "$BIN" -c 'config init' 2>&1 || true)
+if has_cjk "$out"; then
 	fail "config init：英文环境下提示含中文"
 fi
-if [ -f "$tmp/en.toml" ] && grep -q "$CJK" "$tmp/en.toml"; then
+if [ -f "$tmp/en.toml" ] && file_has_cjk "$tmp/en.toml"; then
 	fail "config init：英文模板文件里含中文"
 fi
 
 echo "中文环境：确认中文没有被砍掉"
 # 这里反过来：没有中文才是 bug。选几处最有代表性的。
+# 刻意不查 `type ls` 之类：输出依赖 PATH 里有什么，命中与否不稳定。
 zh_has() {
 	out=$(zh "$BIN" "$@")
-	if ! printf '%s' "$out" | grep -q "$CJK"; then
+	if ! has_cjk "$out"; then
 		fail "中文环境下 $* 没有输出中文（i18n 可能被误删）"
 	fi
 }
 zh_has --help
 zh_has -c 'help'
 zh_has -c 'nonexistent-command-xyz'
-# 刻意不查 `type ls` 之类：输出依赖 PATH 里有什么，命中与否不稳定。
-env -u LC_ALL -u LC_MESSAGES LANG=zh_CN.UTF-8 CMDS_CONFIG="$tmp/zh.toml" \
-	"$BIN" -c 'config init' >/dev/null 2>&1 || true
-if [ -f "$tmp/zh.toml" ] && ! grep -q "$CJK" "$tmp/zh.toml"; then
+
+env -u LC_ALL -u LC_MESSAGES -u CMDS_LANG LANG=zh_CN.UTF-8 \
+	CMDS_CONFIG="$tmp/zh.toml" "$BIN" -c 'config init' >/dev/null 2>&1 || true
+if [ -f "$tmp/zh.toml" ] && ! file_has_cjk "$tmp/zh.toml"; then
 	fail "config init：中文环境下模板没有中文注释"
 fi
 
 echo "强制语言：CMDS_LANG 必须能盖过 locale"
 out=$(env -u LC_ALL -u LC_MESSAGES LANG=zh_CN.UTF-8 CMDS_LANG=en "$BIN" --help 2>&1 || true)
-if printf '%s' "$out" | grep -q "$CJK"; then
-	fail "CMDS_LANG=en 没能盖过 LANG=zh_CN（仍输出中文）"
+if has_cjk "$out"; then
+	fail "CMDS_LANG=en 没能盖过 LANG=zh_CN → $(first_cjk_line "$out")"
 fi
-
-echo "安装脚本：两个方向都查"
-script="$ROOT/install/install.sh"
-out=$(en sh "$script" --help)
-if printf '%s' "$out" | grep -q "$CJK"; then
-	fail "install.sh --help：英文环境下出现中文 → $(printf '%s' "$out" | grep -m1 "$CJK" | cut -c1-90)"
-fi
-out=$(zh sh "$script" --help)
-if ! printf '%s' "$out" | grep -q "$CJK"; then
-	fail "install.sh --help：中文环境下没有中文"
-fi
-out=$(env -u LC_ALL -u LC_MESSAGES LANG=zh_CN.UTF-8 CMDS_LANG=en sh "$script" --help)
-if printf '%s' "$out" | grep -q "$CJK"; then
-	fail "install.sh：CMDS_LANG=en 没能盖过 LANG=zh_CN"
+out=$(env -u LANG -u LC_MESSAGES -u LC_CTYPE LC_ALL=C CMDS_LANG=zh "$BIN" --help 2>&1 || true)
+if ! has_cjk "$out"; then
+	fail "CMDS_LANG=zh 没能盖过 LC_ALL=C"
 fi
 
 if [ "$failures" -gt 0 ]; then

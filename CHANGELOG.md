@@ -33,9 +33,16 @@
 - `CMDS_LANG` 环境变量：显式指定界面语言，优先级高于系统 locale。
   中文系统上想要英文界面（或反之）时用它。**CLI 与安装脚本认同一个变量名**——
   之前安装脚本支持、CLI 不支持，是被新加的检查脚本抓出来的
-- `scripts/check-cli-language.sh`：跑真实进程做行为级验证，**双向**断言——
-  英文环境下任何输出不得含中文，中文环境下中文必须还在。只查前者的话，
-  把中文删干净也能「通过」，那不是国际化
+- `scripts/check-cli-language.sh` 与 `scripts/check-install-language.sh`：
+  跑真实进程做行为级验证，**双向**断言——英文环境下任何输出不得含中文，
+  中文环境下中文必须还在。只查前者的话，把中文删干净也能「通过」，
+  那不是国际化。这个双向设计当场就救了一次：CI 上 grep 因 locale 问题恒为假，
+  是中文方向报红才暴露出来的，否则会是一片假绿
+- `scripts/cjk.sh`：中文检测的公共实现，用 Perl 的 `\p{Han}`。
+  **不要用 `grep '[一-龥]'`**——字符区间受 collation 影响，`LC_ALL=C` 下
+  GNU grep 报 `Invalid collation character` 并以错误码退出，所有断言恒为假；
+  macOS 的 BSD grep 恰好能跑，所以本地看不出来。这个文件在被引用时会用
+  一个正例 + 一个反例自检，不对就直接退出，宁可不检查也不给不可信的结论
 - `scripts/check-web-language.mjs`：用 oxc 的真 AST 找站点源码里没走 `t()` 的
   中文字面量。刻意不手写词法分析——JSX 正文里的撇号（`Don't`）和正则字面量
   （`replace(/"/g, …)`）会让手写 tokenizer 状态错位，第一版就因此给出过一次假绿
