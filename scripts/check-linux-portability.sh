@@ -94,11 +94,21 @@ elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
 	# debian:10 = glibc 2.28（用户报错那一档）
 	# centos:7  = glibc 2.17（目前还在用的最老一档）
 	# alpine    = 根本没有 glibc
+	#
+	# 刻意把容器里的真实输出打出来：这是「确实在旧系统上跑起来了」的唯一证据。
+	# 吞掉输出的话，日志里只剩一行「通过」，出问题时也无从判断。
 	for image in debian:10 centos:7 alpine:3.18; do
-		if ! docker run --rm -v "$BIN:/cmds:ro" "$image" /cmds --version >/dev/null 2>&1; then
-			fail "$image 里跑不起来"
-			docker run --rm -v "$BIN:/cmds:ro" "$image" /cmds --version 2>&1 |
-				head -n 3 | sed 's/^/      /' >&2
+		printf '  ── %s\n' "$image"
+		if out=$(docker run --rm -v "$BIN:/cmds:ro" "$image" \
+			/cmds --version 2>&1) &&
+			echoed=$(docker run --rm -v "$BIN:/cmds:ro" "$image" \
+				/cmds -c 'echo container-ok' 2>&1) &&
+			[ "$echoed" = "container-ok" ]; then
+			printf '     %s / %s\n' "$out" "$echoed"
+		else
+			fail "${image} 里跑不起来"
+			printf '%s\n%s\n' "${out:-}" "${echoed:-}" |
+				head -n 4 | sed 's/^/       /' >&2
 		fi
 	done
 else
