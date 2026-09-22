@@ -138,9 +138,17 @@ test -f dist/install.sh && test -f dist/install.ps1
 npm run preview
 curl -fsSL http://localhost:4173/install.sh | head -20
 
-# 安装脚本默认必须是英文
-env -u LANG -u LC_MESSAGES LC_ALL=C sh dist/install.sh --help | grep -q '[一-龥]' \
-  && echo '有问题：英文环境下出现中文' || echo '默认语言正常'
+# 安装脚本默认必须是英文，而且中文环境下必须还说中文。
+# 两个方向都要查：只查前者的话，把中文全删掉也能「通过」，那不是国际化。
+# 这个脚本两个方向都覆盖，而且在下结论之前会先自检中文检测器本身。
+sh scripts/check-install-language.sh
+
+# 想手工查？用 Perl 的 \p{Han}，别用 `grep '[一-龥]'`。grep 的字符区间受
+# collation 影响，在 LC_ALL=C（正是这条检查设的）下 GNU grep 会报
+# "Invalid collation character" 并以非零码退出，于是这条断言无论如何都「通过」。
+# 完整来由见 scripts/cjk.sh。
+env -u LANG -u LC_MESSAGES LC_ALL=C sh dist/install.sh --help \
+  | perl -CSD -ne 'if (/\p{Han}/) { print "有问题：英文环境下出现中文：$_"; exit 1 }'
 ```
 
 - [ ] `install.sh` 与 `install.ps1` 在站点根目录，返回 `text/plain`

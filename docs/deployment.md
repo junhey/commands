@@ -141,9 +141,18 @@ test -f dist/install.sh && test -f dist/install.ps1
 npm run preview
 curl -fsSL http://localhost:4173/install.sh | head -20
 
-# the installer must be English by default
-env -u LANG -u LC_MESSAGES LC_ALL=C sh dist/install.sh --help | grep -q '[一-龥]' \
-  && echo 'BROKEN: Chinese in an English environment' || echo 'default language OK'
+# the installer must be English by default *and* still Chinese when the locale asks.
+# Both directions matter: checking only the first one would "pass" if you deleted
+# every Chinese string, which is not i18n. This script covers both, and self-checks
+# its own Chinese detector before trusting any result.
+sh scripts/check-install-language.sh
+
+# Checking by hand? Use Perl's \p{Han} — never `grep '[一-龥]'`. A grep character
+# range depends on the collation, and under LC_ALL=C (exactly what this check sets)
+# GNU grep exits non-zero with "Invalid collation character", so the test silently
+# passes no matter what. See scripts/cjk.sh for the full story.
+env -u LANG -u LC_MESSAGES LC_ALL=C sh dist/install.sh --help \
+  | perl -CSD -ne 'if (/\p{Han}/) { print "BROKEN: Chinese in an English environment: $_"; exit 1 }'
 ```
 
 - [ ] `install.sh` and `install.ps1` are in the site root and return `text/plain`
