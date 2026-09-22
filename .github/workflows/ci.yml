@@ -164,8 +164,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck
           shellcheck --severity=warning install/install.sh
-          # 检查脚本本身用完整模式：它们是「守门人」，自己出错的代价更高
-          shellcheck scripts/check-cli-language.sh scripts/check-install-language.sh
+          # 检查脚本本身用完整模式（不只 warning）：它们是「守门人」，自己出错代价更高。
+          # -x 让 shellcheck 跟进 `. scripts/cjk.sh`，否则会因 SC1091 报错。
+          shellcheck -x scripts/check-cli-language.sh scripts/check-install-language.sh
 
       - name: PowerShell 语法检查
         shell: pwsh
