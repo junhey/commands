@@ -141,6 +141,12 @@ jobs:
       - name: 静态断言 + 旧发行版容器实跑
         run: sh scripts/check-linux-portability.sh
 
+      # Release 工作流是用**相对路径**调这个脚本的，而 `docker -v` 只接受绝对路径。
+      # 之前 CI 只试了默认的绝对路径，于是同一个脚本 CI 绿、发布红。
+      # 这里补上相对路径这条调用方式，把两边的用法都覆盖住。
+      - name: 相对路径调用也必须能用（Release 就是这么调的）
+        run: sh scripts/check-linux-portability.sh target/x86_64-unknown-linux-musl/release/cmds
+
       # install.sh 的平台映射必须和 Release 实际产出的资产名对得上，
       # 对不上就会静默退化成 cargo 源码构建（慢且需要 Rust 工具链）。
       - name: install.sh 的 Linux 目标必须以 musl 优先

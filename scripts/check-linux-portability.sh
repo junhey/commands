@@ -39,6 +39,16 @@ if [ ! -f "$BIN" ]; then
 	exit 2
 fi
 
+# 规范成绝对路径：`docker -v` 只接受绝对路径，传相对路径会被当成「卷名」，
+# 报 "includes invalid characters for a local volume name"。
+# CI job 用的是脚本默认值（本来就是绝对路径）所以看不出来；Release 传的是
+# `target/<target>/release/cmds` 这种相对路径，于是只在发布时炸。
+# 调用方用什么形式传参，不该决定脚本能不能用——在入口统一掉。
+case "$BIN" in
+/*) ;;
+*) BIN="$(CDPATH='' cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")" ;;
+esac
+
 # GNU readelf 在 Linux 上叫 readelf，macOS 上通常只有 llvm-readelf（Xcode 自带）。
 READELF=''
 for candidate in readelf llvm-readelf eu-readelf; do
