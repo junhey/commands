@@ -51,7 +51,7 @@ expect_en() {
 	shift
 	out=$(en "$BIN" "$@")
 	if has_cjk "$out"; then
-		fail "$desc：英文环境下出现中文 → $(first_cjk_line "$out")"
+		fail "${desc}：英文环境下出现中文 → $(first_cjk_line "$out")"
 	fi
 }
 

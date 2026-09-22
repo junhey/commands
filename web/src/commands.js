@@ -18,7 +18,7 @@ import { t } from "./i18n.js";
 export const BRAND = {
   name: "Commands",
   bin: "cmds",
-  version: "0.2.0",
+  version: "0.2.1",
   repo: "junhey/commands",
   repoUrl: "https://github.com/junhey/commands",
   // 单元测试数。页面和 README 都在宣传这个数字，散着写迟早对不上，

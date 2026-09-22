@@ -60,14 +60,20 @@ links to the source directly.
 
 | Platform | Target |
 | --- | --- |
-| Linux (x86-64) | `x86_64-unknown-linux-gnu` |
-| Linux (ARM64) | `aarch64-unknown-linux-gnu` |
+| Linux (x86-64) | `x86_64-unknown-linux-musl` |
+| Linux (ARM64) | `aarch64-unknown-linux-musl` |
 | macOS (Intel) | `x86_64-apple-darwin` |
 | macOS (Apple silicon) | `aarch64-apple-darwin` |
 | Windows (x86-64) | `x86_64-pc-windows-msvc` |
 | Windows (ARM64) | `aarch64-pc-windows-msvc` |
 
 Anything else builds from source via `cargo`, which the installer does for you.
+
+The Linux builds are **statically linked against musl**, so they carry no glibc dependency and
+run on any distribution — Debian 10, CentOS 7, Alpine, minimal containers included. A
+dynamically linked build would bake the build machine's glibc version into the binary and fail
+with `version 'GLIBC_2.xx' not found` on anything older, which is exactly what happened before
+v0.2.1.
 
 ## Quick start
 

@@ -131,14 +131,20 @@ while [ "$#" -gt 0 ]; do
 done
 
 # ── Platform detection ──────────────────────────────────────────────────
-detect_target() {
+# 每行输出一个候选 target，按优先级从高到低。
+#
+# Linux 上 musl 排在 gnu 前面：从 v0.2.1 起 Linux 包改成 musl 静态链接，
+# 因为动态链接 glibc 的包会把构建机的 glibc 版本写进 ELF 的版本需求，
+# 在旧发行版上直接 `version GLIBC_2.xx not found`。保留 gnu 作为回退，
+# 是为了让 `--version v0.2.0` 这类指定旧版本的安装仍然能找到资产。
+detect_targets() {
 	os="$(uname -s)"
 	arch="$(uname -m)"
 	case "$os" in
-	Linux) os_part="unknown-linux-gnu" ;;
-	Darwin) os_part="apple-darwin" ;;
-	FreeBSD) os_part="unknown-freebsd" ;;
-	MINGW* | MSYS* | CYGWIN*) os_part="pc-windows-msvc" ;;
+	Linux) os_parts="unknown-linux-musl unknown-linux-gnu" ;;
+	Darwin) os_parts="apple-darwin" ;;
+	FreeBSD) os_parts="unknown-freebsd" ;;
+	MINGW* | MSYS* | CYGWIN*) os_parts="pc-windows-msvc" ;;
 	*)
 		error "$(msg "unsupported system: $os" "暂不支持的系统：$os")"
 		exit 1
@@ -154,7 +160,9 @@ detect_target() {
 		exit 1
 		;;
 	esac
-	printf '%s-%s' "$arch_part" "$os_part"
+	for os_part in $os_parts; do
+		printf '%s-%s\n' "$arch_part" "$os_part"
+	done
 }
 
 writable() {
@@ -290,6 +298,25 @@ install_from_release() {
 	return 0
 }
 
+# 依次尝试各候选 target，第一个成功就收工。
+# 第一个候选失败通常只是「这个版本的 Release 里没有这个资产名」，不是错误，
+# 所以不报错，只在切换时说明一下，免得用户看到一条 404 的下载地址一头雾水。
+install_any_release() {
+	bin_dir="$1"
+	tried=0
+	for target in $TARGETS; do
+		if [ "$tried" -ne 0 ]; then
+			info "$(msg "not published for that target, trying " \
+				"该目标没有发布包，改用 ")${BOLD}${target}${RESET}"
+		fi
+		tried=1
+		if install_from_release "$target" "$bin_dir"; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 install_from_source() {
 	bin_dir="$1"
 	if ! has cargo; then
@@ -328,7 +355,9 @@ printf '%s\n\n' "${DIM}$(msg \
 	"history autosuggestions · Tab candidate menu · starship-style prompt" \
 	"历史自动建议 · Tab 候选菜单 · starship 风格提示符")${RESET}"
 
-TARGET="$(detect_target)"
+TARGETS="$(detect_targets)"
+# 展示用只取首选那个，回退目标是实现细节，没必要摆到用户眼前。
+TARGET="$(printf '%s\n' "$TARGETS" | head -n 1)"
 BIN_DIR="$(choose_bin_dir)"
 # 标点也要跟着语言走：英文用半角冒号加空格，中文用全角冒号。
 info "$(msg "platform: " "平台：")${BOLD}${TARGET}${RESET}"
@@ -353,7 +382,7 @@ fi
 
 if [ -n "$FORCE_BUILD" ]; then
 	install_from_source "$BIN_DIR" || exit 1
-elif ! install_from_release "$TARGET" "$BIN_DIR"; then
+elif ! install_any_release "$BIN_DIR"; then
 	warn "$(msg "no prebuilt package for this platform, building from source" \
 		"没有对应平台的预编译包，改为源码构建")"
 	install_from_source "$BIN_DIR" || exit 1

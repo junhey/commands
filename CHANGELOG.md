@@ -4,6 +4,49 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-22
+
+### 修复
+
+- **Linux 二进制改为静态链接 musl，修掉「装完跑不起来」。** 此前 Linux 包动态链接
+  构建机（`ubuntu-latest` = Ubuntu 24.04，glibc 2.39）的 glibc，产物把
+  `GLIBC_2.39` 写进了 ELF 版本需求，于是在 Debian 10/11、Ubuntu 18.04~22.04、
+  CentOS 7/8 以及大量开发容器上，一键安装装完就是
+
+  ```
+  cmds: /lib64/libc.so.6: version `GLIBC_2.29' not found (required by cmds)
+  ```
+
+  实际效果是「只有最新 Ubuntu 能用」，而 CI 一路绿灯——因为 CI 就跑在构建机上，
+  这类问题它天然测不出来。
+
+  改成 musl 静态链接后产物零动态依赖，任何 Linux 都能跑（含 Alpine）。
+  能这么做的前提是项目没有任何 C 依赖：crossterm / unicode-width / libc 全是纯
+  Rust，libc 只用到 `signal()`，用户名取自环境变量而非 NSS 查询——所以不存在
+  静态 musl 的 NSS 陷阱。也因此用 `rust-lld` 配 rustup 自带的 musl std 就够，
+  不需要 `musl-tools`，连 aarch64 的交叉工具链都省了。
+
+  预编译目标名随之改变（`*-unknown-linux-gnu` → `*-unknown-linux-musl`）。
+  `install.sh` 会先试 musl、失败再回退 gnu，所以 `--version v0.2.0` 这类指定
+  旧版本的安装仍能匹配到那些 Release 实际发布的资产。
+
+- 修掉两处 `$VAR` 紧跟全角标点的写法（`check-cli-language.sh` 与新脚本各一处）。
+  全角字符的首字节会被 shell 当成变量名的一部分，`set -u` 下直接
+  `unbound variable`，没有 `set -u` 时更糟——静默展开成空字符串。
+
+### 新增
+
+- `scripts/check-linux-portability.sh`：两层验证。① 静态断言——产物不得有动态
+  依赖、不得引用 glibc 符号版本；② 行为验证——在 `debian:10`（glibc 2.28，
+  正是用户报错那一档）、`centos:7`（2.17）、`alpine`（无 glibc）里真的把产物跑起来。
+  第一层只能说明「没链错」，第二层才是用户真正关心的事。
+  反向验证过：拿 v0.2.0 的旧产物跑，三条断言全部报红并指出 `最高 GLIBC_2.39`。
+- CI 新增 `Linux 可移植性` job 调用上面的脚本；Release 工作流在打包前也跑同一个
+  脚本，坏产物流不出去。
+- `scripts/check-shell-quoting.sh`：揪出 `$VAR` 紧跟多字节字符的写法。
+  这个坑在本仓库踩过三次，而 shellcheck 认为它语法合法、查不出来，所以做成检查
+  而不是继续靠记性。
+
 ## [0.2.0] - 2026-09-22
 
 这一版只做一件事：**把「默认英文」从 README 扩展到整个产品**。

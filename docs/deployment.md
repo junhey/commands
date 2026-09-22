@@ -91,8 +91,8 @@ git push origin v0.2.0
 It produces packages for six platforms, and the names must match what the install script builds:
 
 ```
-cmds-x86_64-unknown-linux-gnu.tar.gz    (+ .sha256)
-cmds-aarch64-unknown-linux-gnu.tar.gz   (+ .sha256)
+cmds-x86_64-unknown-linux-musl.tar.gz   (+ .sha256)
+cmds-aarch64-unknown-linux-musl.tar.gz  (+ .sha256)
 cmds-x86_64-apple-darwin.tar.gz         (+ .sha256)
 cmds-aarch64-apple-darwin.tar.gz        (+ .sha256)
 cmds-x86_64-pc-windows-msvc.zip         (+ .sha256)
@@ -103,6 +103,29 @@ SHA256SUMS
 > When you change `BIN` / `REPO` in `install.sh`, or the package names in the Release workflow,
 > **change both sides together**. Otherwise one-line install 404s and silently degrades to a
 > `cargo` source build.
+
+### Linux must stay on musl
+
+**Do not switch the Linux targets back to `-gnu`.** A dynamically linked build records the
+*build machine's* glibc version in the ELF version requirements. `ubuntu-latest` is 24.04
+(glibc 2.39), so the binary demands `GLIBC_2.39` and dies on Debian 10/11, Ubuntu 18.04–22.04,
+CentOS 7/8 and most dev containers:
+
+```
+cmds: /lib64/libc.so.6: version `GLIBC_2.29' not found (required by cmds)
+```
+
+CI never catches this on its own, because CI runs on the build machine. That is why
+`scripts/check-linux-portability.sh` exists: it asserts the artifact is static with no glibc
+references, then actually runs it inside `debian:10`, `centos:7` and `alpine`.
+
+This works because cmds has no C dependencies — crossterm, unicode-width and libc are all pure
+Rust, libc is only used for `signal()`, and the username comes from environment variables rather
+than an NSS lookup. So there is no musl-static NSS trap, and `rust-lld` plus the musl std that
+rustup ships is enough: no `musl-tools`, no cross toolchain.
+
+`install.sh` tries musl first and falls back to gnu, so `--version v0.2.0` and older still
+resolve to the assets those releases actually published.
 
 The install script still works without any Release: if it cannot fetch a prebuilt package it
 falls back to `cargo install --locked --git ...`, just slower on first install.

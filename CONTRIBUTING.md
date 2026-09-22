@@ -145,6 +145,31 @@ node scripts/check-web-language.mjs web/src/*.js web/src/*.jsx   # AST 找裸中
 看不出来。现在统一用 `scripts/cjk.sh` 里的 `has_cjk`（Perl 的 `\p{Han}`，
 与 locale 无关，也不会像手写区间那样漏掉扩展区）。
 
+## 发布产物：Linux 必须是 musl 静态
+
+**不要把 Linux 目标改回 `-gnu`。** 动态链接的产物会把**构建机**的 glibc 版本写进
+ELF 版本需求。`ubuntu-latest` 是 24.04（glibc 2.39），于是产物要求 `GLIBC_2.39`，
+在 Debian 10/11、Ubuntu 18.04~22.04、CentOS 7/8 和大多数开发容器上装完直接报
+`version 'GLIBC_2.29' not found`。
+
+**CI 自己测不出这个**——它就跑在构建机上。所以有两道检查：
+
+```sh
+# 静态断言 + 在 debian:10 / centos:7 / alpine 里实跑（有 docker 才跑第二层）
+sh scripts/check-linux-portability.sh
+
+# $VAR 紧跟全角标点会吃掉变量名一个字节，shellcheck 查不出来
+sh scripts/check-shell-quoting.sh install/install.sh scripts/*.sh
+```
+
+能用 musl 静态的前提是**项目没有任何 C 依赖**：crossterm / unicode-width / libc
+全是纯 Rust，libc 只用到 `signal()`，用户名取自环境变量而不是 NSS 查询。
+如果以后引入了需要 NSS（`getpwuid`、`getaddrinfo`）或要编译 C 代码的依赖，
+静态 musl 的限制就要重新评估。
+
+改动 `release.yml` 的目标名时，`install.sh` 的 `detect_targets` 要同步——
+CI 有断言钉住这两者一致。
+
 ## 定位边界
 
 cmds 面向**交互使用**。以下不在范围内：

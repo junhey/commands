@@ -56,14 +56,18 @@ Windows 侧对应 `-BinDir`、`-Version`、`-Force`、`-Build`、`-SkipVerify`�
 
 | 平台 | Target |
 | --- | --- |
-| Linux（x86-64） | `x86_64-unknown-linux-gnu` |
-| Linux（ARM64） | `aarch64-unknown-linux-gnu` |
+| Linux（x86-64） | `x86_64-unknown-linux-musl` |
+| Linux（ARM64） | `aarch64-unknown-linux-musl` |
 | macOS（Intel） | `x86_64-apple-darwin` |
 | macOS（Apple 芯片） | `aarch64-apple-darwin` |
 | Windows（x86-64） | `x86_64-pc-windows-msvc` |
 | Windows（ARM64） | `aarch64-pc-windows-msvc` |
 
 其它平台由 `cargo` 从源码构建，安装脚本会自动完成这一步。
+
+Linux 包是**静态链接 musl** 的，不依赖 glibc，任何发行版都能跑——Debian 10、
+CentOS 7、Alpine、精简容器都可以。动态链接的包会把构建机的 glibc 版本写进二进制，
+在更老的系统上直接 `version 'GLIBC_2.xx' not found`，v0.2.1 之前就栽在这上面。
 
 ## 30 秒上手
 
