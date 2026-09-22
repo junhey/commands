@@ -170,6 +170,18 @@ sh scripts/check-shell-quoting.sh install/install.sh scripts/*.sh
 改动 `release.yml` 的目标名时，`install.sh` 的 `detect_targets` 要同步——
 CI 有断言钉住这两者一致。
 
+上面两道检查验的都是**本次构建**的产物，而用户走的是另一条路：线上的
+`install.sh` 去下载线上 Release 的资产。中间那一段（脚本挑的资产名对不对、
+解压后能不能跑、挑错了会不会静默退化成源码构建）由
+`.github/workflows/e2e-install.yml` 负责，它在 Debian 10/9、CentOS 7、Alpine
+四个容器里真的敲一遍 `curl … | sh`。断言逻辑在
+`scripts/check-e2e-install.sh`，本地拿构造的假数据就能反向验证：
+
+```sh
+# 工作流把容器输出丢进 e2e-out/，这个脚本只读文件下结论，不碰网络和 docker
+sh scripts/check-e2e-install.sh e2e-out
+```
+
 ## 定位边界
 
 cmds 面向**交互使用**。以下不在范围内：
@@ -194,6 +206,13 @@ cmds 面向**交互使用**。以下不在范围内：
 发布前工作流会校验 **tag 版本号与 `Cargo.toml` 一致**，不一致直接失败。
 crates.io 的版本不可撤回，所以只有真正打 tag 才会发 registry，
 不带 tag 的手动触发只做构建验证。
+
+5. **发版后手动触发一次 `端到端安装验证`**（Actions → 端到端安装验证 → Run）
+
+这一步验的是「用户真正会敲的那条命令现在能不能用」，跑的是**线上**的
+`install.sh` 和**线上** Release 的资产，所以只能在发布完成之后跑，
+挂在 push / PR 上没有意义（那时候线上还是旧版本）。
+这个工作流另外每周一自己跑一遍，线上哪天悄悄坏掉能在用户报障前先知道。
 
 ### crates.io 相关的两个约束
 

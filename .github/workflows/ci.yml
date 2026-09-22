@@ -214,14 +214,22 @@ jobs:
           shellcheck --severity=warning install/install.sh
           # 检查脚本本身用完整模式（不只 warning）：它们是「守门人」，自己出错代价更高。
           # -x 让 shellcheck 跟进 `. scripts/cjk.sh`，否则会因 SC1091 报错。
-          shellcheck -x scripts/check-cli-language.sh scripts/check-install-language.sh
-          shellcheck scripts/check-linux-portability.sh scripts/check-shell-quoting.sh
+          #
+          # 用通配而不是手写清单：这里原本一个个列脚本名，新增脚本时漏掉了两个，
+          # 于是新脚本压根没被检查过。通配让以后新增的自动纳入。
+          shellcheck -x scripts/*.sh
 
       # `$VAR` 紧跟全角标点时，标点的首字节会被当成变量名的一部分：
       # set -u 下直接 unbound variable，没有 set -u 时静默变成空字符串。
       # 这个坑在本仓库踩过三次，而 shellcheck 认为它语法合法、查不出来。
       - name: shell 变量必须用 ${} 界定（紧跟中文标点时）
         run: sh scripts/check-shell-quoting.sh install/install.sh scripts/*.sh
+
+      # `grep '[一-龥]'` 害过两次：先是 CI 上两个 job 因 "Invalid collation
+      # character" 恒为假、一片假绿；修完脚本，文档「上线前检查」里还留着同一条
+      # 命令，照抄的人拿到的是一条永远打印「正常」的检查。文字规范拦不住复制粘贴。
+      - name: 查中文只准用 \p{Han}，不准用 grep 字符区间
+        run: sh scripts/check-cjk-detection.sh
 
       - name: PowerShell 语法检查
         shell: pwsh

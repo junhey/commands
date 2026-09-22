@@ -1,0 +1,117 @@
+# 端到端安装验证：跑用户真正会敲的那条命令。
+#
+#   curl -fsSL https://junhey.github.io/commands/install.sh | sh
+#
+# 为什么单独开一个工作流：
+# CI 的「Linux 可移植性」job 验证的是**本次构建**的产物能在旧发行版跑，
+# 而用户走的是另一条路——线上的 install.sh 去下载线上 Release 的资产。
+# 这两者之间还有一段没人看着：脚本挑的资产名对不对、下载解压后能不能跑、
+# 挑错了会不会静默退化成源码构建。v0.2.0 的 GLIBC_2.29 事故就出在这一段，
+# 而当时 CI 全绿——因为 CI 就跑在构建机上。
+#
+# 这个工作流测的是**线上已发布的东西**，所以不挂在 push/PR 上（那时候线上还是旧版），
+# 而是发版后手动触发一次，另外每周自己跑一遍，防止哪天线上悄悄坏掉。
+name: 端到端安装验证
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "要验证的版本（留空=latest）"
+        required: false
+        default: ""
+  schedule:
+    # 每周一 02:00 UTC 守一遍线上，坏了能在用户报障前先知道。
+    - cron: "0 2 * * 1"
+
+concurrency:
+  group: e2e-install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      # 一个镜像挂了要能看到其它镜像的结论，否则分不清是「产物坏了」
+      # 还是「某个 EOL 镜像的源/证书坏了」。
+      fail-fast: false
+      matrix:
+        include:
+          # glibc 2.28——正是用户报障那一档（产物当时要求 GLIBC_2.29）。
+          # 用 buildpack-deps 的 -curl 变体是因为它自带 curl 和 ca-certificates，
+          # 不用 apt；Debian 10 已 EOL，一 apt update 就会撞 404 的归档源。
+          - label: Debian 10 (glibc 2.28)
+            image: buildpack-deps:buster-curl
+            prep: ""
+          - label: Debian 9 (glibc 2.24)
+            image: buildpack-deps:stretch-curl
+            prep: ""
+          # CentOS 7 的 glibc 2.17，基础镜像自带 curl，同样不需要动 yum 源。
+          - label: CentOS 7 (glibc 2.17)
+            image: centos:7
+            prep: ""
+          # 真 musl 环境：产物是 musl 静态链接的，这里顺手确认它在 Alpine 也能跑。
+          # Alpine 的源还在维护，装两个包没有 EOL 风险。
+          - label: Alpine 3.18 (musl)
+            image: alpine:3.18
+            prep: "apk add --no-cache ca-certificates curl >/dev/null"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # 单独拉镜像：docker 把拉取进度写 stderr，和验证输出混在一起会污染断言。
+      - name: 拉取镜像
+        run: docker pull -q "${{ matrix.image }}"
+
+      # 容器只负责产生输出，断言一律放宿主做——旧镜像里不一定有 perl，
+      # 而中文检测必须走 scripts/cjk.sh 那一份实现，不能在容器里另抄一套。
+      #
+      # 输出分三个文件，因为断言的严格程度不一样：
+      #   install.log  安装全过程（含 stderr），只做「含/不含」判断
+      #   version.txt  只要 stdout，要能匹配版本号
+      #   behavior.txt 只要 stdout，必须**严格等于** e2e-ok
+      - name: 一键安装 + 实跑
+        run: |
+          set -eu
+          out="$PWD/e2e-out"
+          mkdir -p "$out"
+
+          ver='${{ inputs.version }}'
+          args=''
+          if [ -n "$ver" ]; then
+            args="-v $ver"
+          fi
+
+          # 参数用环境变量传进去，别拼进脚本字符串——空版本号拼出来是
+          # `sh -s -- ''`，那个空参数会被 install.sh 当成未知选项。
+          # 写成 `sh -s -- $INSTALL_ARGS`，展开后是干净的 `sh -s --`，零参数。
+          #
+          # docker -v 只接受绝对路径，相对路径会被当成卷名。
+          docker run --rm -v "$out:/out" -w /tmp \
+            -e INSTALL_ARGS="$args" "${{ matrix.image }}" sh -c '
+            set -e
+            ${{ matrix.prep }}
+            curl -fsSL https://junhey.github.io/commands/install.sh \
+              | sh -s -- $INSTALL_ARGS > /out/install.log 2>&1
+            cmds --version > /out/version.txt 2>/dev/null
+            cmds -c "echo e2e-ok" > /out/behavior.txt 2>/dev/null
+          ' || true
+
+          # 中文方向：同一条命令加个 LANG 就该说中文。只断言语言，不再跑二进制。
+          # -f 是因为上一步已经装过了，不加会停在「已存在」的提示上。
+          docker run --rm -v "$out:/out" -w /tmp \
+            -e LANG=zh_CN.UTF-8 "${{ matrix.image }}" sh -c '
+            set -e
+            ${{ matrix.prep }}
+            curl -fsSL https://junhey.github.io/commands/install.sh \
+              | sh -s -- -f > /out/install.zh.log 2>&1
+          ' || true
+
+      - name: 安装输出
+        run: cat e2e-out/install.log || echo "(没有输出，安装根本没跑起来)"
+
+      # 断言逻辑放脚本里，本地拿构造的假数据就能反向验证（不用等 CI，
+      # 也不用有 docker）；这里只负责调用。和 portability job 同一个路子。
+      - name: 断言（${{ matrix.label }}）
+        run: sh scripts/check-e2e-install.sh e2e-out
