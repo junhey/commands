@@ -75,7 +75,7 @@ jobs:
           name="cmds-${{ matrix.target }}"
           staging="$(mktemp -d)"
           mkdir -p "$staging/$name"
-          cp README.md LICENSE "$staging/$name/"
+          cp README.md README.zh-CN.md LICENSE "$staging/$name/"
           cp cli/assets/config.default.toml "$staging/$name/"
 
           mkdir -p artifacts

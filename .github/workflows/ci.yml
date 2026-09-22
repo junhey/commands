@@ -157,3 +157,55 @@ jobs:
           grep -q '\.sha256' install/install.ps1 || { echo "install.ps1 没有下载 .sha256"; fail=1; }
           [ "$fail" -eq 0 ] && echo "两个脚本的校验逻辑都在位"
           exit "$fail"
+
+  docs:
+    name: 文档一致性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # README.md 是英文（crates.io 与 GitHub 首页都用它），中文版单独一份。
+      # 两份必须能互相跳转，否则读者会卡在看不懂的那一份上。
+      - name: 两份 README 必须互相链接
+        run: |
+          set -eu
+          fail=0
+          test -f README.zh-CN.md || { echo "::error::缺少 README.zh-CN.md"; exit 1; }
+          grep -q 'blob/master/README.zh-CN.md' README.md \
+            || { echo "::error::README.md 里没有指向中文版的链接"; fail=1; }
+          grep -q 'blob/master/README.md' README.zh-CN.md \
+            || { echo "::error::README.zh-CN.md 里没有回到英文版的链接"; fail=1; }
+          [ "$fail" -eq 0 ] && echo "两份 README 互相链接正常"
+          exit "$fail"
+
+      # crates.io 渲染 README 时会把相对链接解析到 crates.io 自身，点开是 404。
+      # CONTRIBUTING.md 写了这条规则，这里把它变成可检查的约束。
+      - name: README 里不能有相对链接
+        run: |
+          set -eu
+          fail=0
+          for f in README.md README.zh-CN.md; do
+            bad=$(grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?://|#|mailto:)' || true)
+            if [ -n "$bad" ]; then
+              echo "::error file=$f::存在相对链接，crates.io 上会 404，请改成完整的 https:// URL"
+              printf '  %s\n' $bad
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "两份 README 的链接都是绝对地址"
+          exit "$fail"
+
+      # 章节数对不上，基本就是改了一侧忘了同步另一侧。
+      - name: 两份 README 章节必须一一对应
+        run: |
+          set -eu
+          en=$(grep -c '^#\{2,3\} ' README.md)
+          zh=$(grep -c '^#\{2,3\} ' README.zh-CN.md)
+          if [ "$en" -ne "$zh" ]; then
+            echo "::error::README.md 有 $en 个章节，README.zh-CN.md 有 $zh 个，两侧需同步"
+            diff <(grep -n '^#\{2,3\} ' README.md) <(grep -n '^#\{2,3\} ' README.zh-CN.md) || true
+            exit 1
+          fi
+          echo "两份 README 各 $en 个章节，一一对应"

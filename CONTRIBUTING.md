@@ -76,6 +76,21 @@ sh -n install/install.sh
 
 **改了一侧就要同步另一侧**，否则网站演示的手感会和真实体验脱节。两侧都有对应的测试。
 
+## 双语 README
+
+`README.md` 是**英文**版，`README.zh-CN.md` 是中文版。英文那份同时被 GitHub 首页和
+crates.io 页面使用（`cli/Cargo.toml` 的 `readme = "../README.md"`），所以它是默认门面。
+
+三条规则，CI 的 `文档一致性` job 会逐条检查：
+
+1. **两份必须互相链接。** 顶部各有一行语言切换，指向对方的完整 GitHub URL。
+2. **不要用相对链接。** crates.io 渲染 README 时相对链接会解析到 crates.io 自身，点开是
+   404。指向仓库文件请写完整的 `https://github.com/junhey/commands/blob/master/...`。
+3. **章节要一一对应。** 两份的 `##` / `###` 标题数量必须相等，改了一侧就翻译到另一侧，
+   不要只动一边。
+
+`cli/Cargo.toml` 的 `description` 也保持英文——crates.io 的搜索结果只显示这一句。
+
 ## 定位边界
 
 cmds 面向**交互使用**。以下不在范围内：
@@ -105,8 +120,7 @@ crates.io 的版本不可撤回，所以只有真正打 tag 才会发 registry�
 
 - **`cli/LICENSE` 必须与根目录 `LICENSE` 一致。** crates.io 只打包 crate 目录内的文件，
   所以 `cli/` 下要自带一份。改许可证时记得 `cp LICENSE cli/LICENSE`，CI 会校验。
-- **README 里不要用相对链接。** crates.io 渲染 README 时相对链接会指向 crates.io 自身，
-  点开是 404。指向仓库文件请写完整的 `https://github.com/junhey/commands/blob/master/...`。
+- **README 里不要用相对链接**，详见上面的「双语 README」。crates.io 上点开会 404。
 
 ### 首次发布 crates.io 的前置条件
 

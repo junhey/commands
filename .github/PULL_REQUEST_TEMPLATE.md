@@ -11,7 +11,7 @@
 - [ ] `cargo test --locked`
 - [ ] `cd web && npm test && npm run build`（改动 web/ 时）
 - [ ] `sh -n install/install.sh`（改动安装脚本时）
-- [ ] 改了用户可见行为时已同步更新 README / 站点指南 / CHANGELOG
+- [ ] 改了用户可见行为时已同步更新 README（英文与 `README.zh-CN.md` 两份）/ 站点指南 / CHANGELOG
 
 ## 备注
 
