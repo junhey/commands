@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### 修复
+
+- Playground 模拟输出里的版本号不再写死：`cargo build` / `cargo test` 的
+  「Compiling cmds v…」与 `npm run dev` 的包名版本改为引用 `BRAND.version`，
+  否则每次发版它们都会变成假信息（站点头部显示 0.1.2，演示里却还是 v0.1.0）
+- `npm run dev` 的模拟输出里 Vite 版本从 `v6.1.0` 更新到 `v8.3.0`，
+  依赖早升到 vite 8 了，演示没跟上
+- `web/package.json` 的版本号与发布版本对齐（0.1.0 → 0.1.2）
+
 ## [0.1.2] - 2026-09-22
 
 ### 变更

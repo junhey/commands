@@ -1,6 +1,6 @@
 {
   "name": "commands-web",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "description": "Commands (cmds) 官网与浏览器 Playground",
   "license": "ISC",

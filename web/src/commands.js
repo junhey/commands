@@ -668,7 +668,8 @@ export function simulateCommand(
     if (words[1] === "test") {
       return {
         output: [
-          "   Compiling cmds v0.1.0",
+          // 版本跟着 BRAND 走，别写死：写死会随每次发版慢慢变成假信息
+          `   Compiling cmds v${BRAND.version}`,
           "    Finished `test` profile in 0.31s",
           "     Running unittests src/main.rs",
           "",
@@ -680,7 +681,7 @@ export function simulateCommand(
     }
     return {
       output: [
-        "   Compiling cmds v0.1.0",
+        `   Compiling cmds v${BRAND.version}`,
         "    Finished `release` profile [optimized] target(s) in 24.71s",
         SIMULATED,
       ],
@@ -692,10 +693,11 @@ export function simulateCommand(
     if (words.includes("dev")) {
       return {
         output: [
-          "> commands-web@0.1.0 dev",
+          `> commands-web@${BRAND.version} dev`,
           "> vite",
           "",
-          "  VITE v6.1.0  ready in 148 ms",
+          // 跟着 web/package.json 的 vite 版本走，升级依赖时记得同步
+          "  VITE v8.3.0  ready in 148 ms",
           "  ➜  Local:   http://localhost:5173/",
           "Playground 预览：no server process was started.",
         ],
