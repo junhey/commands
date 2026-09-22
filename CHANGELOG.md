@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-22
+
 ### 新增
 
 - 发布到 crates.io，`cargo install --locked cmds` 可直接安装。
@@ -94,5 +96,6 @@ CLI 是产品本体，站点是它的官网、Playground 与安装入口。
   GitHub Actions（`checkout` 7 / `upload-artifact` 7 / `download-artifact` 8 /
   `configure-pages` 6 / `deploy-pages` 5）
 
-[unreleased]: https://github.com/junhey/commands/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/junhey/commands/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/junhey/commands/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/junhey/commands/releases/tag/v0.1.0
