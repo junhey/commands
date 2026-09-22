@@ -4,6 +4,26 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-22
+
+### 变更
+
+- **README 默认改为英文**，中文版移到 `README.zh-CN.md`，两份顶部都有语言切换链接。
+  英文那份同时是 GitHub 首页和 crates.io 页面的门面（`readme = "../README.md"`），
+  之前是中文，对非中文读者不友好
+- `cli/Cargo.toml` 的 `description` 也改成英文——crates.io 的搜索结果只显示这一句，
+  中英混排会很割裂
+
+### 新增
+
+- 两份 README 都补齐了原先没写的内容：预编译平台对照表、卸载步骤、
+  与 fish / starship / zsh-autosuggestions 的能力对比、五条常见问题，
+  以及安装目录的实际选择规则（`/usr/local/bin` 可写时用它，否则 `~/.local/bin`）
+- Release 资产里一并带上中文 README
+- CI 新增 `文档一致性` job，三条约束：两份 README 必须互相链接、
+  不得出现相对链接（crates.io 上会 404）、`##` / `###` 章节数必须相等。
+  第二条以前只写在 CONTRIBUTING 里靠人记，现在是硬检查
+
 ## [0.1.1] - 2026-09-22
 
 ### 新增
@@ -96,6 +116,7 @@ CLI 是产品本体，站点是它的官网、Playground 与安装入口。
   GitHub Actions（`checkout` 7 / `upload-artifact` 7 / `download-artifact` 8 /
   `configure-pages` 6 / `deploy-pages` 5）
 
-[unreleased]: https://github.com/junhey/commands/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/junhey/commands/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/junhey/commands/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/junhey/commands/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/junhey/commands/releases/tag/v0.1.0

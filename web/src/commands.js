@@ -13,7 +13,7 @@
 export const BRAND = {
   name: "Commands",
   bin: "cmds",
-  version: "0.1.1",
+  version: "0.1.2",
   repo: "junhey/commands",
   repoUrl: "https://github.com/junhey/commands",
   tagline: "少敲一点，多做一点。",
