@@ -189,7 +189,8 @@ pub fn menu_lines(menu: &Menu, config: &MenuConfig, width: usize) -> Vec<String>
         });
     }
 
-    let mut hint = format!(
+    let mut hint = tf!(
+        "{}/{total} · Tab next · ↑↓ select · Enter accept · Esc close",
         "{}/{total} · Tab 下一项 · ↑↓ 选择 · Enter 采纳 · Esc 关闭",
         menu.selected + 1
     );

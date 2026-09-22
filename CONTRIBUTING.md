@@ -91,6 +91,48 @@ crates.io 页面使用（`cli/Cargo.toml` 的 `readme = "../README.md"`），所
 
 `cli/Cargo.toml` 的 `description` 也保持英文——crates.io 的搜索结果只显示这一句。
 
+## 界面语言：默认英文
+
+**任何用户可见的文案都不许直接写中文。** CLI 输出、安装脚本、配置模板注释、站点 UI
+都默认英文，只有环境明确要求（`CMDS_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`，或浏览器
+语言）才切中文。
+
+中英两份文案写在同一行，而不是拆成资源文件：
+
+```rust
+io.err(t!("no such directory", "目录不存在"));
+io.err(tf!("cannot read {}", "无法读取 {}", path));
+```
+
+```jsx
+<span>{t("Install cmds", "安装 cmds")}</span>
+```
+
+这么做的理由是文案量小，把两种语言摆在眼前，改的时候不会只改一半——引入 gettext
+那一套反而更容易出现「英文改了、中文还是旧的」。
+
+几条容易踩的：
+
+- **`format!` 的格式串必须是字面量**，所以要格式化时用 `tf!` 而不是先 `t!` 拿格式串。
+- **标点也要算进文案里。** `msg "platform: " "平台："` 是对的；把 `：` 留在外面，
+  英文输出就会变成 `platform：`。
+- **状态值不要用文案。** 筛选项、tab 标识这类东西用稳定 id，用文案的话切换语言后
+  选中项会丢。同理，不要用 `aria-label` 之类会翻译的文本当 `querySelector` 的钩子。
+- **测试断言不要依赖环境语言。** 用 `t()` 算出期望值，或显式固定语言，否则本地
+  `zh_CN` 跑过、CI 上 `LANG=en` 就红。
+- **刻意的双语数据表**（如 `[名称, 英文说明, 中文说明]`）用
+  `i18n-pairs-begin` / `i18n-pairs-end` 注释标出范围，检查脚本会跳过。
+
+CI 有两道检查，本地也可以跑：
+
+```sh
+sh scripts/check-cli-language.sh              # 跑真实进程：英文环境无中文，中文环境仍有中文
+node scripts/check-web-language.mjs web/src/*.js web/src/*.jsx   # AST 找裸中文
+```
+
+`check-cli-language.sh` 刻意**双向**断言：只查「英文环境没有中文」的话，把中文全删了
+也能过，那不是国际化。
+
 ## 定位边界
 
 cmds 面向**交互使用**。以下不在范围内：

@@ -4,6 +4,52 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
+这一版只做一件事：**把「默认英文」从 README 扩展到整个产品**。
+
+上一版只把 README 改成了英文，但 `curl -fsSL …/install.sh | sh` 装出来的东西
+仍然是中文——CLI 输出、安装脚本、配置模板注释、官网界面全是中文。对非中文用户来说，
+门面是英文、产品是中文，比全中文更让人困惑。
+
+因为是用户可见行为的大改，按语义化版本升次版本号。
+
+### 变更
+
+- **CLI 默认英文。** 全部输出（`--help`、21 个内建命令、解析错误、补全候选标签、
+  TOML 解析错误、集成脚本注释）改为默认英文，仅在 locale 要求中文时输出中文。
+  语言由 `CMDS_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG` 决定，`C` / `POSIX` /
+  未设置 / 空值都算英文
+- **安装脚本默认英文。** `install.sh` 与 `install.ps1` 重写为双语，同样跟随环境；
+  PowerShell 侧用 `Get-UICulture` 判断
+- **配置模板默认英文。** `cmds config init` 生成的注释跟随语言，两份模板的键值
+  严格一致（有测试钉住）
+- **官网默认英文。** 跟随 `navigator.languages`，侧栏新增语言切换按钮，
+  手动选择记在 localStorage
+- 站点 release notes 与侧栏文案同步到 0.2.0
+
+### 新增
+
+- `CMDS_LANG` 环境变量：显式指定界面语言，优先级高于系统 locale。
+  中文系统上想要英文界面（或反之）时用它。**CLI 与安装脚本认同一个变量名**——
+  之前安装脚本支持、CLI 不支持，是被新加的检查脚本抓出来的
+- `scripts/check-cli-language.sh`：跑真实进程做行为级验证，**双向**断言——
+  英文环境下任何输出不得含中文，中文环境下中文必须还在。只查前者的话，
+  把中文删干净也能「通过」，那不是国际化
+- `scripts/check-web-language.mjs`：用 oxc 的真 AST 找站点源码里没走 `t()` 的
+  中文字面量。刻意不手写词法分析——JSX 正文里的撇号（`Don't`）和正则字面量
+  （`replace(/"/g, …)`）会让手写 tokenizer 状态错位，第一版就因此给出过一次假绿
+- CI 三处新增语言约束：CLI job 跑行为探测、Web job 跑 AST 检查、
+  安装脚本 job 直接跑 `install.sh --help` 比对两种语言
+- CI 新增「宣传的测试数必须等于真实测试数」检查。站点和两份 README 都在写
+  「N 个单元测试」，写死迟早变成假信息；数字现在只在 `BRAND.tests` 留一份
+- README 新增「Language」章节说明语言规则；CONTRIBUTING 新增「界面语言：默认英文」
+  一节，记下 `tf!` 与 `format!` 的关系、标点要算进文案、状态值不能用文案等几个坑
+- `docs/architecture.md` 与 `docs/deployment.md` 改为英文默认，
+  中文版移到 `.zh-CN.md`；两份 README 里补上入口（之前这两份文档没有任何链接指向它们）
+- CLI 测试从 99 增至 109：locale 识别、`CMDS_LANG` 优先级、
+  内建命令表两种语言都必须有说明、两份配置模板键值一致等
+
 ### 修复
 
 - Playground 模拟输出里的版本号不再写死：`cargo build` / `cargo test` 的
@@ -11,7 +57,11 @@
   否则每次发版它们都会变成假信息（站点头部显示 0.1.2，演示里却还是 v0.1.0）
 - `npm run dev` 的模拟输出里 Vite 版本从 `v6.1.0` 更新到 `v8.3.0`，
   依赖早升到 vite 8 了，演示没跟上
-- `web/package.json` 的版本号与发布版本对齐（0.1.0 → 0.1.2）
+- `web/package.json` 的版本号与发布版本对齐
+- 修掉一处潜在失效：`⌘1` 聚焦终端输入框用的是
+  `querySelector('[aria-label="终端命令"]')`，而该 `aria-label` 已被 i18n 化，
+  英文环境下会静默找不到元素。改为稳定的 `id="terminal-input"`
+- 站点侧栏与 release notes 里写死的「99 个单元测试」已随检查一并纠正
 
 ## [0.1.2] - 2026-09-22
 

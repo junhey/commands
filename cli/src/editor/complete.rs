@@ -22,14 +22,14 @@ pub enum CandidateKind {
 impl CandidateKind {
     pub fn label(self) -> &'static str {
         match self {
-            Self::History => "历史",
-            Self::Alias => "别名",
-            Self::Abbr => "缩写",
-            Self::Builtin => "内建",
-            Self::Command => "命令",
-            Self::Directory => "目录",
-            Self::File => "文件",
-            Self::Variable => "变量",
+            Self::History => t!("history", "历史"),
+            Self::Alias => t!("alias", "别名"),
+            Self::Abbr => t!("abbr", "缩写"),
+            Self::Builtin => t!("builtin", "内建"),
+            Self::Command => t!("command", "命令"),
+            Self::Directory => t!("dir", "目录"),
+            Self::File => t!("file", "文件"),
+            Self::Variable => t!("var", "变量"),
         }
     }
 
@@ -136,9 +136,9 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
                 value: command.clone(),
                 display: command,
                 description: if count > 1 {
-                    format!("历史 · 用过 {count} 次")
+                    tf!("history · used {count} times", "历史 · 用过 {count} 次")
                 } else {
-                    "历史".to_string()
+                    t!("history", "历史").to_string()
                 },
                 kind: CandidateKind::History,
                 replace: 0..line.len(),
@@ -175,7 +175,9 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
                 candidates.push(Candidate {
                     value: name.to_string(),
                     display: name.to_string(),
-                    description: builtins::describe(name).unwrap_or("内建命令").to_string(),
+                    description: builtins::describe(name)
+                        .unwrap_or(t!("builtin command", "内建命令"))
+                        .to_string(),
                     kind: CandidateKind::Builtin,
                     replace: token.range.clone(),
                 });
@@ -191,7 +193,7 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
             candidates.push(Candidate {
                 value: name.clone(),
                 display: name,
-                description: format!("别名 → {value}"),
+                description: tf!("alias → {value}", "别名 → {value}"),
                 kind: CandidateKind::Alias,
                 replace: token.range.clone(),
             });
@@ -206,7 +208,7 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
             candidates.push(Candidate {
                 value: name.clone(),
                 display: name,
-                description: format!("缩写 → {value}"),
+                description: tf!("abbr → {value}", "缩写 → {value}"),
                 kind: CandidateKind::Abbr,
                 replace: token.range.clone(),
             });
@@ -223,7 +225,7 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
             candidates.push(Candidate {
                 value: word.clone(),
                 display: word,
-                description: format!("常用 · {count} 次"),
+                description: tf!("frequent · {count} times", "常用 · {count} 次"),
                 kind: CandidateKind::Command,
                 replace: token.range.clone(),
             });
@@ -239,7 +241,7 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
             candidates.push(Candidate {
                 value: name.clone(),
                 display: name,
-                description: "PATH 中的可执行文件".to_string(),
+                description: t!("executable on PATH", "PATH 中的可执行文件").to_string(),
                 kind: CandidateKind::Command,
                 replace: token.range.clone(),
             });
@@ -327,11 +329,11 @@ fn path_candidates(shell: &Shell, token: &TokenContext, only_dirs: bool) -> Vec<
             value.push('/');
         }
         let description = if is_dir {
-            "目录".to_string()
+            t!("dir", "目录").to_string()
         } else {
             match entry.metadata().map(|m| m.len()) {
-                Ok(size) => format!("文件 · {}", util::format_size(size)),
-                Err(_) => "文件".to_string(),
+                Ok(size) => tf!("file · {}", "文件 · {}", util::format_size(size)),
+                Err(_) => t!("file", "文件").to_string(),
             }
         };
         candidates.push(Candidate {

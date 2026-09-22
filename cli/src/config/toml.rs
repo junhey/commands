@@ -184,31 +184,50 @@ pub fn parse(src: &str) -> Result<Table, String> {
         }
         if let Some(header) = line.strip_prefix('[') {
             if header.starts_with('[') {
-                return Err(format!("第 {line_no} 行：暂不支持数组表 `[[...]]`"));
+                return Err(tf!(
+                    "line {line_no}: array-of-tables `[[...]]` is not supported yet",
+                    "第 {line_no} 行：暂不支持数组表 `[[...]]`"
+                ));
             }
             let Some(header) = header.strip_suffix(']') else {
-                return Err(format!("第 {line_no} 行：表头缺少 `]`"));
+                return Err(tf!(
+                    "line {line_no}: table header is missing `]`",
+                    "第 {line_no} 行：表头缺少 `]`"
+                ));
             };
-            prefix = split_key(header.trim()).map_err(|e| format!("第 {line_no} 行：{e}"))?;
+            prefix = split_key(header.trim())
+                .map_err(|e| tf!("line {line_no}: {e}", "第 {line_no} 行：{e}"))?;
             root.ensure_path(&prefix);
             continue;
         }
 
         let Some(eq) = find_unquoted(&line, '=') else {
-            return Err(format!("第 {line_no} 行：缺少 `=`"));
+            return Err(tf!(
+                "line {line_no}: missing `=`",
+                "第 {line_no} 行：缺少 `=`"
+            ));
         };
-        let key = split_key(line[..eq].trim()).map_err(|e| format!("第 {line_no} 行：{e}"))?;
+        let key = split_key(line[..eq].trim())
+            .map_err(|e| tf!("line {line_no}: {e}", "第 {line_no} 行：{e}"))?;
         let mut value_src = line[eq + 1..].trim().to_string();
         while unbalanced(&value_src) {
             let Some((_, next)) = lines.next() else {
-                return Err(format!("第 {line_no} 行：数组/内联表未闭合"));
+                return Err(tf!(
+                    "line {line_no}: unterminated array or inline table",
+                    "第 {line_no} 行：数组/内联表未闭合"
+                ));
             };
             value_src.push(' ');
             value_src.push_str(strip_comment(next).trim());
         }
-        let (value, rest) = parse_value(&value_src).map_err(|e| format!("第 {line_no} 行：{e}"))?;
+        let (value, rest) = parse_value(&value_src)
+            .map_err(|e| tf!("line {line_no}: {e}", "第 {line_no} 行：{e}"))?;
         if !rest.trim().is_empty() {
-            return Err(format!("第 {line_no} 行：多余内容 `{}`", rest.trim()));
+            return Err(tf!(
+                "line {line_no}: trailing content `{}`",
+                "第 {line_no} 行：多余内容 `{}`",
+                rest.trim()
+            ));
         }
         let mut full = prefix.clone();
         full.extend(key);
@@ -269,7 +288,7 @@ fn unbalanced(text: &str) -> bool {
 
 fn split_key(raw: &str) -> Result<Vec<String>, String> {
     if raw.is_empty() {
-        return Err("键名为空".to_string());
+        return Err(t!("empty key", "键名为空").to_string());
     }
     let mut parts = Vec::new();
     let mut rest = raw;
@@ -285,7 +304,7 @@ fn split_key(raw: &str) -> Result<Vec<String>, String> {
             .or_else(|| part.strip_prefix('\'').and_then(|p| p.strip_suffix('\'')))
             .unwrap_or(part);
         if part.is_empty() {
-            return Err(format!("非法键名 `{raw}`"));
+            return Err(tf!("invalid key `{raw}`", "非法键名 `{raw}`"));
         }
         parts.push(part.to_string());
         match remainder {
@@ -302,7 +321,7 @@ fn parse_value(src: &str) -> Result<(Value, &str), String> {
     let _ = offset;
     let mut chars = trimmed.char_indices();
     let Some((_, first)) = chars.next() else {
-        return Err("值为空".to_string());
+        return Err(t!("empty value", "值为空").to_string());
     };
     match first {
         '"' => parse_basic_string(trimmed),
@@ -322,7 +341,7 @@ fn parse_basic_string(src: &str) -> Result<(Value, &str), String> {
             '"' => return Ok((Value::Str(out), &src[index + 1..])),
             '\\' => {
                 let Some((_, esc)) = chars.next() else {
-                    return Err("字符串转义未完成".to_string());
+                    return Err(t!("incomplete string escape", "字符串转义未完成").to_string());
                 };
                 out.push(match esc {
                     'n' => '\n',
@@ -338,14 +357,18 @@ fn parse_basic_string(src: &str) -> Result<(Value, &str), String> {
             c => out.push(c),
         }
     }
-    Err("字符串缺少结束引号".to_string())
+    Err(t!("string is missing its closing quote", "字符串缺少结束引号").to_string())
 }
 
 fn parse_literal_string(src: &str) -> Result<(Value, &str), String> {
     let body = &src[1..];
     match body.find('\'') {
         Some(end) => Ok((Value::Str(body[..end].to_string()), &body[end + 1..])),
-        None => Err("字面字符串缺少结束引号".to_string()),
+        None => Err(t!(
+            "literal string is missing its closing quote",
+            "字面字符串缺少结束引号"
+        )
+        .to_string()),
     }
 }
 
@@ -358,7 +381,7 @@ fn parse_array(src: &str) -> Result<(Value, &str), String> {
             return Ok((Value::Array(items), remainder));
         }
         if rest.is_empty() {
-            return Err("数组缺少 `]`".to_string());
+            return Err(t!("array is missing `]`", "数组缺少 `]`").to_string());
         }
         let (value, remainder) = parse_value(rest)?;
         items.push(value);
@@ -378,10 +401,10 @@ fn parse_inline_table(src: &str) -> Result<(Value, &str), String> {
             return Ok((Value::Table(table), remainder));
         }
         if rest.is_empty() {
-            return Err("内联表缺少 `}`".to_string());
+            return Err(t!("inline table is missing `}`", "内联表缺少 `}`").to_string());
         }
         let Some(eq) = find_unquoted(rest, '=') else {
-            return Err("内联表缺少 `=`".to_string());
+            return Err(t!("inline table is missing `=`", "内联表缺少 `=`").to_string());
         };
         let key = split_key(rest[..eq].trim())?;
         let (value, remainder) = parse_value(&rest[eq + 1..])?;
@@ -410,7 +433,10 @@ fn parse_scalar(src: &str) -> Result<(Value, &str), String> {
             } else if let Ok(f) = cleaned.parse::<f64>() {
                 Value::Float(f)
             } else {
-                return Err(format!("无法解析的值 `{token}`"));
+                return Err(tf!(
+                    "cannot parse value `{token}`",
+                    "无法解析的值 `{token}`"
+                ));
             }
         }
     };

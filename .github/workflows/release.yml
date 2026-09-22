@@ -76,7 +76,7 @@ jobs:
           staging="$(mktemp -d)"
           mkdir -p "$staging/$name"
           cp README.md README.zh-CN.md LICENSE "$staging/$name/"
-          cp cli/assets/config.default.toml "$staging/$name/"
+          cp cli/assets/config.default.toml cli/assets/config.default.zh-CN.toml "$staging/$name/"
 
           mkdir -p artifacts
           if [[ "${{ matrix.target }}" == *windows* ]]; then

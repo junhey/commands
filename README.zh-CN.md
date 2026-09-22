@@ -15,7 +15,7 @@
 ❯ cargo bu[ild --release --locked]          ← 灰色为历史建议，→ 采纳
 
 ❯ git c
-▸ git commit -m "fix: 补全越界"   历史 · 用过 12 次
+▸ git commit -m "fix: guard the bounds"   历史 · 用过 12 次
   git checkout -b feature/menu    历史 · 用过 5 次
   checkout                        命令 · PATH
 1/8 · Tab 下一项 · ↑↓ 选择 · Enter 采纳 · Esc 关闭
@@ -133,6 +133,21 @@ gcm = "git commit -m"
 
 启动脚本：`~/.cmdsrc`（或 `~/.config/cmds/init.cmds`），里面可以写任意 cmds 命令。
 
+## 界面语言
+
+CLI、安装脚本、配置模板与官网**默认都是英文**，只有环境明确要求时才输出中文。
+优先级与 POSIX 一致：`CMDS_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`。
+以 `zh` 开头的 locale 选中文；`C`、`POSIX`、其它语种和未设置都算英文。
+
+```sh
+cmds                         # 跟随系统 locale
+CMDS_LANG=zh cmds            # 强制中文
+CMDS_LANG=en cmds            # 中文系统上强制英文
+CMDS_LANG=en sh install.sh   # 安装脚本认同一个变量
+```
+
+官网跟随浏览器语言，侧栏里也有切换按钮。
+
 ## 命令行用法
 
 ```sh
@@ -211,7 +226,7 @@ docs/               补充文档
 
 ```sh
 # CLI
-cargo test                    # 99 个单元测试
+cargo test                    # 109 个单元测试
 cargo build --release --locked
 cargo run -- -c "echo hello"
 
@@ -220,11 +235,19 @@ cd web && npm install
 npm run dev                   # 本地开发，同时提供 /install.sh
 npm test                      # Playground 内核测试
 npm run build                 # 静态产物到 web/dist
+
+# 默认语言检查（除 locale 指明中文，处处都该是英文）
+sh scripts/check-cli-language.sh              # 跑真实二进制与 install.sh
+node scripts/check-web-language.mjs web/src/*.js web/src/*.jsx
 ```
 
 `web/src/commands.js` 刻意复刻了 CLI 的几条规则（内建命令清单、候选排序、
 拼写建议算法、历史权重），改了一侧要同步另一侧。细节见
 [CONTRIBUTING.md](https://github.com/junhey/commands/blob/master/CONTRIBUTING.md)。
+
+延伸阅读：
+[架构说明](https://github.com/junhey/commands/blob/master/docs/architecture.zh-CN.md) ·
+[部署上线](https://github.com/junhey/commands/blob/master/docs/deployment.zh-CN.md)
 
 ## 隐私
 

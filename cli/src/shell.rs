@@ -102,7 +102,7 @@ impl Shell {
     pub fn set_cwd(&mut self, path: PathBuf) -> std::io::Result<()> {
         let canonical = normalize(std::fs::canonicalize(&path)?);
         if !canonical.is_dir() {
-            return Err(std::io::Error::other("不是目录"));
+            return Err(std::io::Error::other(t!("not a directory", "不是目录")));
         }
         std::env::set_current_dir(&canonical)?;
         let previous = std::mem::replace(&mut self.cwd, canonical.clone());
@@ -166,7 +166,13 @@ impl Shell {
             .retain(|job| !finished.iter().any(|(id, _, _)| *id == job.id));
         if self.interactive {
             for (id, command, code) in finished {
-                println!("[{id}] 结束（退出码 {code}）{command}");
+                println!(
+                    "{}",
+                    tf!(
+                        "[{id}] done (exit {code}) {command}",
+                        "[{id}] 结束（退出码 {code}）{command}"
+                    )
+                );
             }
         }
     }
@@ -329,7 +335,14 @@ pub fn load_rc(shell: &mut Shell) {
             Ok(text) => {
                 exec::run_script(shell, &text);
             }
-            Err(error) => eprintln!("cmds: 无法读取 {}: {error}", path.display()),
+            Err(error) => eprintln!(
+                "{}",
+                tf!(
+                    "cmds: cannot read {}: {error}",
+                    "cmds: 无法读取 {}: {error}",
+                    path.display()
+                )
+            ),
         }
         break;
     }
@@ -374,7 +387,13 @@ pub fn run_interactive(shell: &mut Shell) -> i32 {
                     return shell.last_status;
                 }
                 Err(error) => {
-                    eprintln!("cmds: 读取输入失败：{error}");
+                    eprintln!(
+                        "{}",
+                        tf!(
+                            "cmds: failed to read input: {error}",
+                            "cmds: 读取输入失败：{error}"
+                        )
+                    );
                     return 1;
                 }
             }
@@ -415,7 +434,10 @@ fn greet(shell: &Shell) {
         "{}",
         style::paint(
             "dimmed",
-            "输入 help 查看快捷键 · Tab 弹出候选 · config init 生成配置模板",
+            t!(
+                "Type help for keybindings · Tab opens candidates · config init writes a template",
+                "输入 help 查看快捷键 · Tab 弹出候选 · config init 生成配置模板"
+            ),
         )
     );
 }
@@ -434,7 +456,13 @@ pub fn run_stdin(shell: &mut Shell) -> i32 {
     use std::io::Read;
     let mut text = String::new();
     if let Err(error) = std::io::stdin().read_to_string(&mut text) {
-        eprintln!("cmds: 读取 stdin 失败：{error}");
+        eprintln!(
+            "{}",
+            tf!(
+                "cmds: failed to read stdin: {error}",
+                "cmds: 读取 stdin 失败：{error}"
+            )
+        );
         return 1;
     }
     let status = exec::run_script(shell, &text);
