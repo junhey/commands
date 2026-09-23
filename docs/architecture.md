@@ -130,7 +130,7 @@ Both `cli/src/shell.rs` and `web/tests/commands.test.js` have regression tests f
 
 | Scope | Tool | Count |
 | --- | --- | --- |
-| CLI | `cargo test` (unit tests inline in each module) | 155 |
+| CLI | `cargo test` (unit tests inline in each module) | 157 |
 | Playground core | `node --test` | 42 |
 | Install scripts | `sh -n` + shellcheck + PowerShell Parser | syntax level |
 | Default language | `scripts/check-cli-language.sh`, `scripts/check-web-language.mjs` | behavioural + AST |

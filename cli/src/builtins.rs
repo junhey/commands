@@ -548,6 +548,18 @@ fn config(shell: &mut Shell, args: &[String], io: &mut BuiltinIo<'_>) -> i32 {
         Some("show") => {
             let config = shell.config.clone();
             io.out(&format!("format          = {:?}", config.format));
+            // 写死模块列表的配置拿不到后续版本新增的模块（旧配置会盖掉新默认值）。
+            // 这是升级时最容易踩、又最不容易发现的一件事：功能在，但看不见。
+            // 用户主动查看配置的时候提示，是打扰最小的时机。
+            if !config.format.contains("$all") {
+                io.out(&tf!(
+                    "                  ↑ lists modules one by one, so modules added in later \
+versions will not show up. Use {} to follow along.",
+                    "                  ↑ 模块是逐个写死的，后续版本新增的模块不会出现。\
+改用 {} 可以一直跟上。",
+                    "$all"
+                ));
+            }
             io.out(&format!("right_format    = {:?}", config.right_format));
             io.out(&format!("add_newline     = {}", config.add_newline));
             io.out(&tf!(
@@ -707,6 +719,42 @@ mod tests {
             String::from_utf8_lossy(&out).into_owned(),
             String::from_utf8_lossy(&err).into_owned(),
         )
+    }
+
+    /// 写死模块列表的配置拿不到新版本的模块，`config show` 必须提醒；
+    /// 用了 `$all` 的配置不该被打扰。
+    #[test]
+    fn config_show_flags_a_hard_coded_format() {
+        // config 是 Rc，改不了字段，所以构造时就把 format 传进去
+        let with_format = |format: &str| {
+            Shell::new(
+                Config {
+                    format: format.to_string(),
+                    ..Config::default()
+                },
+                false,
+            )
+        };
+
+        let mut shell = with_format("$dir$character");
+        let (status, out, _) = run(&mut shell, "config", &["show"]);
+        assert_eq!(status, 0);
+        assert!(out.contains("$all"), "写死模块列表时应提示改用 $all：{out}");
+
+        let mut shell = with_format("$all$line_break$character");
+        let (_, out, _) = run(&mut shell, "config", &["show"]);
+        let hint_lines = out.lines().filter(|line| line.contains('↑')).count();
+        assert_eq!(hint_lines, 0, "已经用了 $all 就不该再提示：{out}");
+    }
+
+    /// `config show` 要能告诉用户有哪些模块可用，否则改 format 得先翻文档。
+    #[test]
+    fn config_show_lists_prompt_modules() {
+        let mut shell = Shell::new(Config::default(), false);
+        let (_, out, _) = run(&mut shell, "config", &["show"]);
+        for module in ["container", "git_state", "venv"] {
+            assert!(out.contains(module), "模块清单里缺 {module}：{out}");
+        }
     }
 
     #[test]

@@ -248,7 +248,7 @@ docs/               补充文档
 
 ```sh
 # CLI
-cargo test                    # 155 个单元测试
+cargo test                    # 157 个单元测试
 cargo build --release --locked
 cargo run -- -c "echo hello"
 

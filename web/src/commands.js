@@ -23,7 +23,7 @@ export const BRAND = {
   repoUrl: "https://github.com/junhey/commands",
   // 单元测试数。页面和 README 都在宣传这个数字，散着写迟早对不上，
   // 所以只留这一处；CI 的 docs job 会拿 `cargo test` 的真实结果校验它。
-  tests: 155,
+  tests: 157,
   get tagline() {
     return t("Type less, do more.", "少敲一点，多做一点。");
   },

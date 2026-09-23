@@ -122,7 +122,7 @@ tests/            内核与安装地址的单元测试（node:test，无需浏�
 
 | 范围 | 工具 | 数量 |
 | --- | --- | --- |
-| CLI | `cargo test`（单元测试内嵌在各模块） | 155 |
+| CLI | `cargo test`（单元测试内嵌在各模块） | 157 |
 | Playground 内核 | `node --test` | 42 |
 | 安装脚本 | `sh -n` + shellcheck + PowerShell Parser | 语法级 |
 | 默认语言 | `scripts/check-cli-language.sh`、`scripts/check-web-language.mjs` | 行为级 + AST |

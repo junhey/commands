@@ -59,7 +59,7 @@
 - 默认 `format` 改为 `$all$line_break$container$shlvl$character`，`$languages`
   新增 `prefix`（默认 `via `），与示例中的 `via  v20.20.2` 一致。前缀跟内容一起
   出现，检测不到语言时不会留下孤立的 `via`。
-- 单元测试 109 → 155。
+- 单元测试 109 → 157。
 
 ## [0.2.1] - 2026-09-22
 

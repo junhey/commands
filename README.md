@@ -260,7 +260,7 @@ docs/               additional documentation
 
 ```sh
 # CLI
-cargo test                    # 155 unit tests
+cargo test                    # 157 unit tests
 cargo build --release --locked
 cargo run -- -c "echo hello"
 
