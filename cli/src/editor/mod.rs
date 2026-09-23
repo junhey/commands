@@ -9,6 +9,8 @@
 pub mod complete;
 pub mod highlight;
 pub mod render;
+pub mod scripts;
+pub mod subcommands;
 pub mod suggest;
 
 use crate::config::Config;

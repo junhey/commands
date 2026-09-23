@@ -84,9 +84,13 @@ cmds config init    # 生成配置模板（可选）
 | 历史自动建议 | 输入时在光标后用灰色显示最近匹配的历史命令，`→` / `End` / `Ctrl-F` 采纳整条，`Alt-→` 采纳一个词；历史未命中时退回补全建议 |
 | Tab 候选菜单 | `Tab` 弹出菜单，历史整条命令排最前，其后是内建 / 别名 / 缩写 / PATH 命令 / 目录文件 / 变量；`↑` `↓` 选择，`Enter` 采纳，`Esc` 关闭 |
 | 智能补全细节 | 唯一候选直接补全；多候选先补公共前缀；`cd` 后只列目录；含空格的路径自动加引号 |
+| 子命令补全 | 输入 `git ` 就给出 `status` / `log` / `commit` 并带说明。内置 17 张命令表（git、cargo、npm、pnpm、yarn、docker、kubectl、go、brew、systemctl…），含 `git remote` 这类二级命令；可在 `[completions]` 里补充或覆盖 |
+| 项目脚本补全 | `npm run ` / `pnpm ` 补全最近 `package.json` 里的 `scripts`；`make ` 补全 Makefile 的 target，并把 `target: ## 说明` 的自文档注释当作描述 |
+| 预置脚本 | `[scripts]` 里的条目会出现在候选菜单里。名字和命令本身都参与匹配，`gst` 和 `git st` 都能找到 `git status --short --branch`——不必先记住缩写 |
 | 历史检索 | `Ctrl-R` 模糊搜索，`↑` `↓` 按当前前缀翻历史，按使用频率 + 新鲜度排序 |
 | 实时语法高亮 | 命令存在绿色、拼错红色，字符串 / 操作符 / 变量 / 选项分色；命令找不到时按编辑距离给建议，内建与自定义别名优先 |
-| 模块化提示符 | `$dir` `$git_branch` `$git_status` `$languages` `$cmd_duration` `$status` `$character` `$time` `$identity` `$jobs`，TOML 配置 |
+| 模块化提示符 | 20 个模块，TOML 配置：`$dir` `$git_branch` `$git_state` `$git_status` `$git_commit` `$languages` `$package` `$venv` `$container` `$username` `$hostname` `$os` `$shlvl` `$cmd_duration` `$status` `$time` `$jobs` `$identity` `$line_break` `$character`。整个信息区可以直接写 `$all`，后续版本新增模块时不用再改配置；`config show` 可列出全部 |
+| 环境感知 | `$container` 把 Docker / Podman / Dev Container / Codespaces / WSL 标成 `⬢ [Docker]`；`$git_state` 在操作做到一半时显示 `REBASE 2/5` / `MERGING`；用户名与主机名默认 `"auto"`，只在 root、SSH 会话和容器里出现，本地保持干净 |
 | fish 式缩写 | `abbr gcm "git commit -m"`，按空格即展开，历史里存的是完整命令 |
 | 执行能力 | 管道、`&&` `\|\|` `;`、重定向（`>` `>>` `<` `2>` `2>>` `&>`）、后台 `&`、glob（`*` `?` `[a-z]` `**`）、变量展开 |
 | 也能只当提示符 | `eval "$(cmds init bash)"`、`cmds init fish \| source`，接到现有 bash / zsh / fish / PowerShell |
@@ -114,7 +118,9 @@ cmds config init    # 生成配置模板（可选）
 官网的 **Config 页**可以勾选提示符模块直接生成这份文件，省得手写 TOML。
 
 ```toml
-format = "$dir$git_branch$git_status$languages$cmd_duration$status$line_break$character"
+# $all 是第一行的信息区；把模块一个个写死的话，
+# 后续版本新增的模块永远进不了你的提示符。
+format = "$all$line_break$container$shlvl$character"
 add_newline = true
 
 [autosuggest]
@@ -128,11 +134,23 @@ selected_style = "bold fg:black bg:cyan"
 [git]
 status_enabled = true      # 超大仓库可以关掉
 
+[identity]
+show_user = "auto"         # true / false / "auto"（只在 root、SSH、容器里显示）
+show_host = "auto"
+
 [aliases]
 ll = "ls -lah"
 
 [abbreviations]
 gcm = "git commit -m"
+
+# 预置脚本，按名字或命令本身都能召回
+[scripts]
+gst = "git status --short --branch"
+
+# 补充或覆盖内置的子命令表
+[completions.git]
+st = "我们团队的简写"
 ```
 
 启动脚本：`~/.cmdsrc`（或 `~/.config/cmds/init.cmds`），里面可以写任意 cmds 命令。
@@ -230,7 +248,7 @@ docs/               补充文档
 
 ```sh
 # CLI
-cargo test                    # 109 个单元测试
+cargo test                    # 157 个单元测试
 cargo build --release --locked
 cargo run -- -c "echo hello"
 

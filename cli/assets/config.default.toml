@@ -5,7 +5,11 @@
 
 # ── Prompt ──────────────────────────────────────────────────────────────
 # $module placeholders are replaced by that module's output; $line_break is a newline.
-format = "$identity$dir$git_branch$git_status$languages$cmd_duration$status$line_break$character"
+#
+# $all is the first-line information area. Prefer it over spelling out every
+# module: a hard-coded list never picks up modules added in later versions.
+# Run `config show` to list every available module name.
+format = "$all$line_break$container$shlvl$character"
 # Right-hand prompt, drawn at the end of the same line, e.g. "$time"
 right_format = ""
 # Leave a blank line before each prompt; gives the output room to breathe
@@ -38,10 +42,22 @@ branch_style = "bold purple"
 status_enabled = true
 status_style = "bold red"
 detached_symbol = "@"
+# In-progress operations: REBASE 2/5, MERGING, CHERRY-PICKING, BISECTING.
+# Worth keeping on — a branch name alone never tells you that you are
+# halfway through a rebase.
+state_enabled = true
+state_style = "bold yellow"
+# Short commit hash, off by default because the branch name usually says enough
+commit_enabled = false
+commit_style = "dimmed green"
+commit_length = 7
 
 [languages]
 enabled = true
 show_version = true
+# Prefix for the combined $languages module, rendering as "via  v20.20.2".
+# It only appears together with the content, so it never dangles.
+prefix = "via "
 
 # Each language can override symbol / style / enabled / files / extensions / version_cmd
 [languages.rust]
@@ -84,9 +100,50 @@ utc_offset = 0
 show_seconds = false
 
 [identity]
-show_user = false
-show_host = false
-style = "bold dimmed green"
+# true / false / "auto". "auto" only shows the name when it is worth saying:
+# root, an SSH session, or inside a container. Local everyday work stays clean,
+# and a container or remote box labels itself automatically.
+show_user = "auto"
+show_host = "auto"
+style = "bold green"
+# root gets its own colour — it is a state you want to notice
+root_style = "bold red"
+host_symbol = "🌐 "
+# Connector between the modules: "root in 🌐 box in repo".
+# It belongs to the module, so a missing value never leaves a stray "in".
+suffix = " in "
+
+[container]
+# Detects Docker / Podman / Dev Container / Codespaces / WSL and shows ⬢ [Docker].
+# Environment variables and marker files only — no process is spawned.
+# Set CMDS_CONTAINER=name to label an environment that cannot be detected.
+enabled = true
+symbol = "⬢"
+style = "bold dimmed red"
+show_name = true
+
+[venv]
+# Python virtualenv / conda environment, rendered as (project-name)
+enabled = true
+symbol = ""
+style = "dimmed cyan"
+
+[package]
+# Version of the current project, read from package.json / Cargo.toml / pyproject.toml
+enabled = false
+symbol = "📦 "
+style = "bold blue"
+
+[shlvl]
+# Nesting depth, for when you lose track of how many shells deep you are
+enabled = false
+symbol = "↕ "
+style = "bold yellow"
+threshold = 2
+
+[os]
+enabled = false
+style = "bold white"
 
 # ── Input (fish flavour) ────────────────────────────────────────────────
 [autosuggest]
@@ -140,6 +197,28 @@ gl = "git log --oneline --graph --decorate -20"
 gco = "git checkout"
 gcm = "git commit -m"
 gp = "git push"
+
+# Preset scripts show up in the candidate menu. Both the name and the command
+# itself are matched, so "gst" and "git st" both find the entry — you do not
+# have to remember the shorthand for it to be useful.
+# Nothing destructive here on purpose: gclean is a dry run, drop the -n yourself.
+[scripts]
+gst = "git status --short --branch"
+glog = "git log --oneline --graph --decorate -20"
+gdiff = "git diff --stat"
+gsync = "git pull --rebase --autostash"
+gundo = "git reset --soft HEAD~1"
+gclean = "git clean -nd"
+
+# Subcommand completion: typing `git ` offers status / log / commit …
+# 17 command tables ship built in (see `config show`). Add your own below, or
+# override a built-in entry by reusing its name. Quote chains with spaces.
+#
+# [completions.git]
+# st = "shorthand our team uses"
+#
+# [completions."git remote"]
+# sync = "our deploy helper"
 
 [env]
 # EDITOR = "vim"

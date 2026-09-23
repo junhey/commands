@@ -4,7 +4,11 @@
 
 # ── 提示符 ─────────────────────────────────────────────────────────────
 # $module 占位符会被对应模块的输出替换；$line_break 表示换行。
-format = "$identity$dir$git_branch$git_status$languages$cmd_duration$status$line_break$character"
+#
+# $all 是第一行的信息区。请优先用它，而不是把模块一个个列出来：
+# 写死的列表永远拿不到后续版本新增的模块。
+# 可用模块名可以用 `config show` 查看。
+format = "$all$line_break$container$shlvl$character"
 # 右侧提示符（写在同一行的右端），例如 "$time"
 right_format = ""
 # 每次提示符前空一行，视觉上更松快
@@ -21,28 +25,39 @@ error_style = "bold red"
 
 [dir]
 style = "bold cyan"
-# 保留最后 N 级目录，0 表示不截断
+# 只保留最后 N 段路径；0 表示不截断
 truncation_length = 3
 truncation_symbol = "…/"
-# 在 git 仓库内时，从仓库根开始显示
+# 在 git 仓库内，路径从仓库根开始显示
 truncate_to_repo = true
 home_symbol = "~"
 
 [git]
 enabled = true
-# 默认留空以兼容任意字体；装了 Nerd Font 可以改成 " "
+# 默认留空以适配任意字体；装了 Nerd Font 可以用 " "
 branch_symbol = ""
 branch_style = "bold purple"
-# 关闭可以避免大仓库里执行 `git status`
+# 超大仓库可以关掉，避免每次都跑 `git status`
 status_enabled = true
 status_style = "bold red"
 detached_symbol = "@"
+# 进行中的操作：REBASE 2/5、MERGING、CHERRY-PICKING、BISECTING。
+# 建议开着——只看分支名，永远不知道自己正卡在 rebase 中间。
+state_enabled = true
+state_style = "bold yellow"
+# 短 commit hash，默认关闭，因为分支名通常已经够用
+commit_enabled = false
+commit_style = "dimmed green"
+commit_length = 7
 
 [languages]
 enabled = true
 show_version = true
+# 聚合模块 $languages 的前缀，渲染成 "via  v20.20.2"。
+# 前缀跟内容一起出现，所以不会单独留在提示符上。
+prefix = "via "
 
-# 每种语言都可以单独覆盖 symbol / style / enabled / files / extensions / version_cmd
+# 每种语言都可单独覆盖 symbol / style / enabled / files / extensions / version_cmd
 [languages.rust]
 symbol = "🦀 "
 style = "bold red"
@@ -65,7 +80,7 @@ style = "bold blue"
 
 [cmd_duration]
 enabled = true
-# 超过这个毫秒数才显示耗时
+# 只有命令耗时超过这个值才显示
 min_time_ms = 2000
 style = "bold yellow"
 prefix = "took "
@@ -78,30 +93,71 @@ symbol = "✘ "
 [time]
 enabled = false
 style = "dimmed white"
-# 与 UTC 的小时偏移，东八区填 8
+# 与 UTC 的小时偏移；东八区填 8
 utc_offset = 0
 show_seconds = false
 
 [identity]
-show_user = false
-show_host = false
-style = "bold dimmed green"
+# true / false / "auto"。"auto" 只在身份值得说明时才显示：
+# root、SSH 会话、或者在容器里。本地日常开发保持干净，
+# 进了容器或远程机器会自动标出来。
+show_user = "auto"
+show_host = "auto"
+style = "bold green"
+# root 单独上色——这是个需要被看见的状态
+root_style = "bold red"
+host_symbol = "🌐 "
+# 模块之间的连接词："root in 🌐 box in repo"。
+# 它属于模块本身，所以取不到值时不会留下孤零零的 "in"。
+suffix = " in "
 
-# ── 输入体验（fish 风味）─────────────────────────────────────────────
+[container]
+# 识别 Docker / Podman / Dev Container / Codespaces / WSL，显示成 ⬢ [Docker]。
+# 只读环境变量和标记文件，不会 fork 任何进程。
+# 识别不出来的环境可以用 CMDS_CONTAINER=名字 手动标注。
+enabled = true
+symbol = "⬢"
+style = "bold dimmed red"
+show_name = true
+
+[venv]
+# Python 虚拟环境 / conda 环境，显示成 (项目名)
+enabled = true
+symbol = ""
+style = "dimmed cyan"
+
+[package]
+# 当前项目的版本号，从 package.json / Cargo.toml / pyproject.toml 读
+enabled = false
+symbol = "📦 "
+style = "bold blue"
+
+[shlvl]
+# 嵌套层级，用来搞清楚自己套了几层 shell
+enabled = false
+symbol = "↕ "
+style = "bold yellow"
+threshold = 2
+
+[os]
+enabled = false
+style = "bold white"
+
+# ── 输入（fish 风味）───────────────────────────────────────────────────
 [autosuggest]
-# 边打字边给出灰色的历史建议，→ / End / Ctrl-F 一键采纳
+# 边输入边给出灰色的历史建议；→ / End / Ctrl-F 采纳
 enabled = true
 style = "dimmed"
-# 建议来源顺序：history（历史）、completion（命令与路径补全）
+# 建议来源顺序：先历史，再补全（命令与路径）
 sources = ["history", "completion"]
 
 [menu]
-# Tab 弹出候选菜单，↑/↓ 选择，Enter 采纳，Esc 关闭
+# Tab 打开候选菜单；↑/↓ 选择，Enter 采纳，Esc 关闭
 enabled = true
 max_rows = 8
 max_candidates = 200
 show_descriptions = true
-# 多个候选有公共前缀时先补齐公共部分
+# 多个候选共享前缀时，先补齐公共部分
 auto_insert_common_prefix = true
 selected_style = "bold fg:black bg:cyan"
 description_style = "dimmed"
@@ -112,7 +168,7 @@ hint_style = "dimmed italic"
 # file = "~/.cmds_history"
 max_entries = 20000
 dedup = true
-# 以空格开头的命令不写入历史
+# 以空格开头的命令不记录
 ignore_space = true
 ignore_commands = ["exit", "clear"]
 
@@ -126,7 +182,7 @@ variable = "cyan"
 option = "bold blue"
 comment = "dimmed"
 
-# ── 别名 / 缩写 / 环境变量 ───────────────────────────────────────────
+# ── 别名 / 缩写 / 环境变量 ─────────────────────────────────────────────
 [aliases]
 ll = "ls -lah"
 la = "ls -A"
@@ -134,11 +190,32 @@ gs = "git status"
 gd = "git diff"
 gl = "git log --oneline --graph --decorate -20"
 
-# 缩写：输入后按空格立即展开成完整命令（fish 的 abbr）
+# 缩写会在按下空格的瞬间展开成完整命令（fish 的 abbr）
 [abbreviations]
 gco = "git checkout"
 gcm = "git commit -m"
 gp = "git push"
+
+# 预置脚本会出现在候选菜单里。名字和命令本身都参与匹配，
+# 所以输入 "gst" 或 "git st" 都能找到——不必先记住缩写才用得上。
+# 刻意没放破坏性命令：gclean 是 dry-run，要真删自己把 -n 去掉。
+[scripts]
+gst = "git status --short --branch"
+glog = "git log --oneline --graph --decorate -20"
+gdiff = "git diff --stat"
+gsync = "git pull --rebase --autostash"
+gundo = "git reset --soft HEAD~1"
+gclean = "git clean -nd"
+
+# 子命令补全：输入 `git ` 就会给出 status / log / commit……
+# 内置 17 张命令表（可用 `config show` 查看）。下面可以补充自己的，
+# 用同名项则会覆盖内置说明。命令链带空格时用引号括起来。
+#
+# [completions.git]
+# st = "我们团队的简写"
+#
+# [completions."git remote"]
+# sync = "我们的部署脚本"
 
 [env]
 # EDITOR = "vim"

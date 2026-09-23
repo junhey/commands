@@ -12,6 +12,7 @@ mod exec;
 mod glob;
 mod history;
 mod integration;
+mod json;
 mod parser;
 mod prompt;
 mod shell;

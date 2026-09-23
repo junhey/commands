@@ -90,9 +90,13 @@ cmds config init    # write a config template (optional)
 | History autosuggestion | The best matching history entry appears in grey after the cursor. `→` / `End` / `Ctrl-F` accepts the whole line, `Alt-→` accepts one word. Falls back to completion candidates when history has no match |
 | `Tab` candidate menu | `Tab` opens a menu: whole history commands first, then builtins, aliases, abbreviations, `PATH` commands, files and directories, and variables. `↑` `↓` to select, `Enter` to accept, `Esc` to close |
 | Completion details | A single candidate is inserted directly; multiple candidates first complete the shared prefix; `cd` only lists directories; paths containing spaces get quoted automatically |
+| Subcommand completion | `git ` offers `status` / `log` / `commit` with descriptions. 17 command tables ship built in (git, cargo, npm, pnpm, yarn, docker, kubectl, go, brew, systemctl …), including second level ones like `git remote`. Extend or override them under `[completions]` |
+| Project scripts | `npm run ` / `pnpm ` completes the `scripts` from the nearest `package.json`; `make ` completes Makefile targets and uses the `target: ## comment` self-documentation as the description |
+| Preset scripts | `[scripts]` entries show up in the menu. Both the name and the command are matched, so `gst` and `git st` both find `git status --short --branch` — no need to memorise shorthands |
 | History search | `Ctrl-R` for fuzzy search, `↑` `↓` walks history filtered by the current prefix, ranked by frequency plus recency |
 | Live syntax highlighting | Existing commands turn green, typos red; strings, operators, variables and flags each get their own color. Unknown commands get edit-distance suggestions, with builtins and your own aliases ranked first |
-| Modular prompt | `$dir` `$git_branch` `$git_status` `$languages` `$cmd_duration` `$status` `$character` `$time` `$identity` `$jobs`, configured in TOML |
+| Modular prompt | 20 modules configured in TOML: `$dir` `$git_branch` `$git_state` `$git_status` `$git_commit` `$languages` `$package` `$venv` `$container` `$username` `$hostname` `$os` `$shlvl` `$cmd_duration` `$status` `$time` `$jobs` `$identity` `$line_break` `$character`. Use `$all` for the whole information area so later versions can add modules without you editing the config. `config show` lists them |
+| Context awareness | `$container` labels Docker / Podman / Dev Container / Codespaces / WSL as `⬢ [Docker]`; `$git_state` shows `REBASE 2/5` / `MERGING` when an operation is half-finished; user and host default to `"auto"`, appearing only for root, SSH sessions and containers, so local work stays quiet |
 | fish-style abbreviations | `abbr gcm "git commit -m"` expands when you press space, and history stores the expanded command |
 | Execution | Pipes, `&&` `\|\|` `;`, redirection (`>` `>>` `<` `2>` `2>>` `&>`), background `&`, globs (`*` `?` `[a-z]` `**`), variable expansion |
 | Prompt-only mode | `eval "$(cmds init bash)"` or `cmds init fish \| source` plugs the prompt into your existing bash / zsh / fish / PowerShell |
@@ -123,7 +127,9 @@ The **Config page** on the website generates this file from checkboxes, so you d
 write TOML by hand.
 
 ```toml
-format = "$dir$git_branch$git_status$languages$cmd_duration$status$line_break$character"
+# $all is the first-line information area; spelling modules out by hand means
+# later versions can never add anything to your prompt.
+format = "$all$line_break$container$shlvl$character"
 add_newline = true
 
 [autosuggest]
@@ -137,11 +143,23 @@ selected_style = "bold fg:black bg:cyan"
 [git]
 status_enabled = true      # worth disabling in very large repositories
 
+[identity]
+show_user = "auto"         # true / false / "auto" (root, SSH and containers only)
+show_host = "auto"
+
 [aliases]
 ll = "ls -lah"
 
 [abbreviations]
 gcm = "git commit -m"
+
+# Preset scripts, recalled by name or by the command itself
+[scripts]
+gst = "git status --short --branch"
+
+# Add to or override the built-in subcommand tables
+[completions.git]
+st = "shorthand our team uses"
 ```
 
 Startup script: `~/.cmdsrc` (or `~/.config/cmds/init.cmds`) may contain any cmds commands.
@@ -242,7 +260,7 @@ docs/               additional documentation
 
 ```sh
 # CLI
-cargo test                    # 109 unit tests
+cargo test                    # 157 unit tests
 cargo build --release --locked
 cargo run -- -c "echo hello"
 

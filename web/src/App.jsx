@@ -49,6 +49,7 @@ import {
   initialHistory,
   isKnownCommand,
   loadStored,
+  defaultPromptModules,
   promptModules,
   saveStored,
   simulateCommand,
@@ -92,7 +93,10 @@ const defaultSettings = {
 };
 
 const defaultConfig = {
-  modules: promptModules.map(([id]) => id),
+  // 只勾默认会显示的那些，和装完立刻看到的提示符一致。
+  // 全勾上会把 $os / $package 这类默认关闭的模块也写进 format，
+  // 生成的配置看起来很热闹，实际什么都不显示，反而让人困惑。
+  modules: defaultPromptModules,
   addNewline: true,
   lineBreak: true,
   autosuggest: true,
