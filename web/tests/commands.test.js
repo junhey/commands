@@ -249,7 +249,9 @@ test("空命令是安全的 no-op", () => {
 test("默认配置是合法且完整的 TOML 片段", () => {
   const toml = buildConfigToml();
   assert.ok(toml.includes('format = "'));
-  assert.ok(toml.includes("$line_break$character"));
+  // 换行之后是第二行：container / shlvl 贴着提示符号，和 CLI 默认一致
+  assert.ok(toml.includes("$line_break"));
+  assert.ok(toml.trimEnd().includes("$character"));
   assert.ok(toml.includes("add_newline = true"));
   assert.ok(toml.includes("[autosuggest]"));
   assert.ok(toml.includes("[menu]"));
@@ -266,6 +268,20 @@ test("取消勾选的模块不会出现在 format 里", () => {
   const format = toml.match(/format = "(.*)"/)[1];
   assert.equal(format, "$dir$line_break$character");
   assert.ok(!format.includes("$git_branch"));
+});
+
+test("container 与 shlvl 画在第二行，和 CLI 默认 format 一致", () => {
+  const toml = buildConfigToml({
+    modules: ["$dir", "$container", "$shlvl", "$character"],
+  });
+  const format = toml.match(/format = "(.*)"/)[1];
+  assert.equal(format, "$dir$line_break$container$shlvl$character");
+});
+
+test("没有勾选提示符号时，第二行的模块也不会丢", () => {
+  const toml = buildConfigToml({ modules: ["$dir", "$container"] });
+  const format = toml.match(/format = "(.*)"/)[1];
+  assert.equal(format, "$dir$container");
 });
 
 test("模块顺序固定，不受勾选顺序影响", () => {

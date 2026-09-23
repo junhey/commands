@@ -39,9 +39,12 @@ editor/        line editor
   mod.rs         key handling, render scheduling
   suggest.rs     ghost suggestions from history
   complete.rs    candidate generation and ranking
+  subcommands.rs built-in subcommand tables (git / cargo / docker …)
+  scripts.rs     project scripts: package.json scripts, Makefile targets
   highlight.rs   syntax highlighting
   render.rs      width calculation, wrapping, menu drawing
-prompt/        modular prompt (dir / git / languages / duration / status …)
+prompt/        modular prompt (dir / git / languages / container / duration …)
+json.rs        minimal JSON reader for top-level fields in package.json
 exec.rs        pipes, redirection, logical operators, background jobs
 parser.rs      lexing and parsing
 builtins.rs    21 builtin commands
@@ -127,7 +130,7 @@ Both `cli/src/shell.rs` and `web/tests/commands.test.js` have regression tests f
 
 | Scope | Tool | Count |
 | --- | --- | --- |
-| CLI | `cargo test` (unit tests inline in each module) | 109 |
+| CLI | `cargo test` (unit tests inline in each module) | 155 |
 | Playground core | `node --test` | 42 |
 | Install scripts | `sh -n` + shellcheck + PowerShell Parser | syntax level |
 | Default language | `scripts/check-cli-language.sh`, `scripts/check-web-language.mjs` | behavioural + AST |

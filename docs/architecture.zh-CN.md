@@ -38,9 +38,12 @@ editor/        行编辑器
   mod.rs         按键处理、渲染调度
   suggest.rs     历史 ghost 建议
   complete.rs    候选生成与排序
+  subcommands.rs 内置子命令表（git / cargo / docker…）
+  scripts.rs     项目脚本：package.json 的 scripts、Makefile 的 target
   highlight.rs   语法高亮
   render.rs      宽度计算、折行、菜单绘制
-prompt/        模块化提示符（dir / git / 语言 / 耗时 / 状态…）
+prompt/        模块化提示符（dir / git / 语言 / 容器 / 耗时…）
+json.rs        轻量 JSON 读取，用于取 package.json 的顶层字段
 exec.rs        管道、重定向、逻辑连接、后台任务
 parser.rs      词法与语法分析
 builtins.rs    21 个内建命令
@@ -119,7 +122,7 @@ tests/            内核与安装地址的单元测试（node:test，无需浏�
 
 | 范围 | 工具 | 数量 |
 | --- | --- | --- |
-| CLI | `cargo test`（单元测试内嵌在各模块） | 109 |
+| CLI | `cargo test`（单元测试内嵌在各模块） | 155 |
 | Playground 内核 | `node --test` | 42 |
 | 安装脚本 | `sh -n` + shellcheck + PowerShell Parser | 语法级 |
 | 默认语言 | `scripts/check-cli-language.sh`、`scripts/check-web-language.mjs` | 行为级 + AST |

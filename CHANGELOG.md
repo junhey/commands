@@ -4,6 +4,63 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **提示符补上 6 个模块，信息量对齐 starship。** 新增 `$container`、`$git_state`、
+  `$git_commit`、`$venv`、`$package`、`$os`、`$shlvl`，共 20 个模块：
+
+  ```
+  root in 🌐 joonhe-1rnzdldo2a in wetv-monorepo on  chore/ci-queue via  v20.20.2 took 4s
+  ⬢ [Docker] ❯
+  ```
+
+  - `$container` 识别 Docker / Podman / Dev Container / Codespaces / WSL，显示
+    `⬢ [Docker]`。只读环境变量和标记文件，不 fork 进程——提示符每次回车都要渲染，
+    `systemd-detect-virt` 那种调用的代价不划算。识别不出来的环境可以用
+    `CMDS_CONTAINER=名字` 手动标注。显式变量刻意排在文件探测之前：Codespaces 和
+    devcontainer 内部同样有 `/.dockerenv`，顺序反了会一律显示成 Docker。
+  - `$git_state` 显示 `REBASE 2/5` / `MERGING` / `CHERRY-PICKING` / `BISECTING`。
+    只看分支名永远不知道自己正卡在 rebase 中间。
+  - `$package` 读 package.json / Cargo.toml / pyproject.toml 的版本号。读文件而不是
+    调包管理器：`npm version` 那类命令要几百毫秒，提示符等不起。
+  - `$venv` 在虚拟环境目录叫 `.venv` / `venv` / `env` 时往上取一层项目名——
+    一排 `(.venv)` 是没有信息量的。
+
+- **用户名与主机名改为三态可见性。** `show_user` / `show_host` 现在接受
+  `true` / `false` / `"auto"`，默认 `"auto"`：只在 root、SSH 会话或容器里显示。
+  本地日常开发提示符保持干净，进了容器或远程机器自动带上身份。root 单独用红色。
+  原来写 `true` / `false` 的配置照旧生效。
+
+- **`$all` 占位符。** 展开为第一行的整个信息区。配置里写死模块列表的话，以后版本
+  新增的模块永远不会出现（旧配置会盖掉新默认值），`format = "$all$line_break$character"`
+  可以一直跟上。默认模板已改用它。
+
+- **子命令补全：输入 `git ` 直接给出 `status` / `log` / `commit`。** 内置 17 张命令表
+  （git、cargo、npm、pnpm、yarn、docker、kubectl、go、brew、systemctl…），含
+  `git remote`、`docker compose` 这类二级命令，每项都带双语说明。匹配要求整条命令链
+  精确命中，所以 `git status ` 之后不会再把一级子命令列一遍。可在 `[completions]`
+  里补充或覆盖，命令链带空格时用引号键（`[completions."git remote"]`）。
+
+- **项目脚本补全。** `npm run ` / `pnpm ` / `yarn ` 补全最近 `package.json` 里的
+  `scripts`（monorepo 里会向上找，但到仓库根就停）；`make ` 补全 Makefile 的 target，
+  并把 `target: ## 说明` 的自文档注释当作描述。这些名字只有项目自己知道，
+  又最常用，是补全最该帮忙的地方。
+
+- **`[scripts]` 预置脚本。** 名字和命令本身都参与匹配，所以 `gst` 和 `git st` 都能
+  找到 `git status --short --branch`——只认缩写的话，得先记住缩写才用得上，
+  那就失去意义了。模板预置 6 条，刻意都不带破坏性操作（`gclean` 是 dry-run），
+  有测试钉住这一点。
+
+- `config show` 增加预置脚本数、内置命令表数与全部可用模块名——想改 `format`
+  不用再翻文档查占位符叫什么。
+
+### 变更
+
+- 默认 `format` 改为 `$all$line_break$container$shlvl$character`，`$languages`
+  新增 `prefix`（默认 `via `），与示例中的 `via  v20.20.2` 一致。前缀跟内容一起
+  出现，检测不到语言时不会留下孤立的 `via`。
+- 单元测试 109 → 155。
+
 ## [0.2.1] - 2026-09-22
 
 ### 修复

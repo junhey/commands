@@ -1,7 +1,9 @@
 //! 内建命令。内建在管道中也可用（输出会被捕获后送往下游）。
 
 use crate::config::{self, Config};
+use crate::editor;
 use crate::exec;
+use crate::prompt;
 use crate::shell::Shell;
 use crate::util;
 use std::io::Write;
@@ -569,6 +571,23 @@ fn config(shell: &mut Shell, args: &[String], io: &mut BuiltinIo<'_>) -> i32 {
             ));
             io.out(&format!("aliases         = {}", shell.aliases.len()));
             io.out(&format!("abbreviations   = {}", shell.abbreviations.len()));
+            io.out(&tf!(
+                "scripts         = {} presets",
+                "scripts         = {} 条预置脚本",
+                config.scripts.len()
+            ));
+            io.out(&tf!(
+                "completions     = {} built-in command tables + {} from config",
+                "completions     = {} 张内置子命令表 + 配置里 {} 张",
+                editor::subcommands::chains().count(),
+                config.completions.len()
+            ));
+            // 把可用模块名列出来：不然想改 format 得先去翻文档才知道占位符叫什么。
+            io.out(&tf!(
+                "prompt modules  = {}",
+                "提示符模块      = {}",
+                prompt::modules::MODULE_NAMES.join(" ")
+            ));
             0
         }
         Some(other) => {

@@ -1,5 +1,7 @@
 //! 候选生成：历史整条命令、内建/别名/缩写/PATH 命令、路径、环境变量。
 
+use super::scripts;
+use super::subcommands;
 use crate::builtins;
 use crate::config::Config;
 use crate::shell::Shell;
@@ -13,6 +15,10 @@ pub enum CandidateKind {
     Alias,
     Abbr,
     Builtin,
+    /// 内置/配置的子命令表，如 `git status`。
+    Subcommand,
+    /// 项目自带的脚本（package.json 的 scripts、Makefile 的 target）。
+    Script,
     Command,
     Directory,
     File,
@@ -26,6 +32,8 @@ impl CandidateKind {
             Self::Alias => t!("alias", "别名"),
             Self::Abbr => t!("abbr", "缩写"),
             Self::Builtin => t!("builtin", "内建"),
+            Self::Subcommand => t!("subcommand", "子命令"),
+            Self::Script => t!("script", "脚本"),
             Self::Command => t!("command", "命令"),
             Self::Directory => t!("dir", "目录"),
             Self::File => t!("file", "文件"),
@@ -37,7 +45,9 @@ impl CandidateKind {
         match self {
             Self::History => 0,
             Self::Alias | Self::Abbr => 1,
-            Self::Builtin | Self::Variable => 2,
+            // 子命令和项目脚本排在路径前面：输入 `git s` 想要的是 status，
+            // 不是当前目录里恰好以 s 开头的文件。
+            Self::Builtin | Self::Variable | Self::Subcommand | Self::Script => 2,
             Self::Command => 3,
             Self::Directory => 4,
             Self::File => 5,
@@ -146,6 +156,25 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
         }
     }
 
+    // ①.5 预置脚本：按整行前缀召回，和历史一个路子。
+    //
+    // 刻意不做成「必须记住缩写」：名字和命令本身都参与匹配，所以输入 `gst`
+    // 或者 `git st` 都能找到 `git status --short --branch`。只认缩写的话，
+    // 用户得先记住缩写才用得上——那就失去意义了。
+    let typed = line.trim_start();
+    for (name, command) in &config.scripts {
+        if !name.starts_with(typed) && !command.starts_with(typed) {
+            continue;
+        }
+        candidates.push(Candidate {
+            value: command.clone(),
+            display: command.clone(),
+            description: tf!("script · {name}", "脚本 · {name}"),
+            kind: CandidateKind::Script,
+            replace: 0..line.len(),
+        });
+    }
+
     // ② 环境变量
     if let Some(prefix) = token.text.strip_prefix('$') {
         let keys: Vec<String> = shell
@@ -248,7 +277,13 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
         }
     }
 
-    // ④ 路径补全
+    // ④ 子命令与项目脚本（只在参数位置，命令位置已经在 ③ 处理过了）
+    if !token.command_position {
+        candidates.extend(subcommand_candidates(&token, line, config));
+        candidates.extend(script_candidates(shell, &token, line));
+    }
+
+    // ⑤ 路径补全
     let only_dirs = matches!(
         token.previous.as_deref(),
         Some("cd") | Some("pushd") | Some("rmdir")
@@ -256,6 +291,97 @@ pub fn complete(shell: &mut Shell, line: &str, cursor: usize, config: &Config) -
     candidates.extend(path_candidates(shell, &token, only_dirs));
 
     finish(candidates, config)
+}
+
+/// 光标所在命令已经输入完的词，跳过选项。用来查子命令表：
+/// `git ` → `["git"]`，`git remote ` → `["git", "remote"]`。
+fn command_words(line: &str, token_start: usize) -> Vec<String> {
+    let head = &line[..token_start.min(line.len())];
+    // 从上一个操作符之后算起，`ls | git ` 里的命令是 git 而不是 ls
+    let start = head
+        .rfind(['|', '&', ';'])
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    head[start..]
+        .split_whitespace()
+        .filter(|word| !word.starts_with('-'))
+        .map(str::to_string)
+        .collect()
+}
+
+fn subcommand_candidates(token: &TokenContext, line: &str, config: &Config) -> Vec<Candidate> {
+    let chain = command_words(line, token.range.start).join(" ");
+    if chain.is_empty() {
+        return Vec::new();
+    }
+    let prefix = token.text.as_str();
+    let mut candidates = Vec::new();
+
+    // 用户配置先加：finish() 按「先到先留」去重，这样同名项用户的说明会胜出。
+    for (key, entries) in &config.completions {
+        if key != &chain {
+            continue;
+        }
+        for (name, description) in entries {
+            if name.starts_with(prefix) {
+                candidates.push(Candidate {
+                    value: name.clone(),
+                    display: name.clone(),
+                    description: description.clone(),
+                    kind: CandidateKind::Subcommand,
+                    replace: token.range.clone(),
+                });
+            }
+        }
+    }
+
+    if let Some(list) = subcommands::lookup(&chain) {
+        for entry in list {
+            if entry.name.starts_with(prefix) {
+                candidates.push(Candidate {
+                    value: entry.name.to_string(),
+                    display: entry.name.to_string(),
+                    description: entry.description().to_string(),
+                    kind: CandidateKind::Subcommand,
+                    replace: token.range.clone(),
+                });
+            }
+        }
+    }
+    candidates
+}
+
+/// 项目自带的脚本：`npm run <Tab>` 给 package.json 里的 scripts，
+/// `make <Tab>` 给 Makefile 的 target。这些名字只有项目自己知道，
+/// 记不住又常用，是补全最该帮忙的地方。
+fn script_candidates(shell: &Shell, token: &TokenContext, line: &str) -> Vec<Candidate> {
+    let words = command_words(line, token.range.start);
+    let prefix = token.text.as_str();
+    let entries = match words
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        // 包管理器的 run 子命令
+        ["npm" | "pnpm" | "yarn" | "bun", "run"] => scripts::package_scripts(&shell.cwd),
+        // pnpm / yarn 可以省掉 run 直接写脚本名
+        ["pnpm" | "yarn" | "bun"] => scripts::package_scripts(&shell.cwd),
+        ["make" | "gmake"] => scripts::make_targets(&shell.cwd),
+        _ => Vec::new(),
+    };
+
+    entries
+        .into_iter()
+        .filter(|(name, _)| name.starts_with(prefix))
+        .map(|(name, detail)| Candidate {
+            value: name.clone(),
+            display: name,
+            description: detail,
+            kind: CandidateKind::Script,
+            replace: token.range.clone(),
+        })
+        .collect()
 }
 
 fn finish(mut candidates: Vec<Candidate>, config: &Config) -> Vec<Candidate> {
@@ -474,6 +600,179 @@ mod tests {
             candidates
                 .iter()
                 .any(|c| c.value == "$CMDS_VERSION" && c.kind == CandidateKind::Variable)
+        );
+    }
+
+    // ── 子命令 / 项目脚本 / 预置脚本 ─────────────────────────────────
+
+    fn kinds_of(candidates: &[Candidate], kind: CandidateKind) -> Vec<&str> {
+        candidates
+            .iter()
+            .filter(|c| c.kind == kind)
+            .map(|c| c.value.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn extracts_the_command_chain() {
+        assert_eq!(command_words("git ", 4), vec!["git"]);
+        assert_eq!(command_words("git remote ", 11), vec!["git", "remote"]);
+        // 选项要跳过，否则 `git -C x status` 查不到表
+        assert_eq!(command_words("git -v ", 7), vec!["git"]);
+        // 管道后面是一条新命令
+        assert_eq!(command_words("ls | git ", 9), vec!["git"]);
+        assert!(command_words("", 0).is_empty());
+    }
+
+    #[test]
+    fn suggests_git_subcommands() {
+        let mut shell = Shell::new(Config::default(), false);
+        let config = Config::default();
+
+        // `git ` 之后直接给子命令
+        let candidates = complete(&mut shell, "git ", 4, &config);
+        let subs = kinds_of(&candidates, CandidateKind::Subcommand);
+        for expected in ["status", "log", "commit"] {
+            assert!(subs.contains(&expected), "缺少 git {expected}：{subs:?}");
+        }
+
+        // 带前缀时只给匹配的
+        let candidates = complete(&mut shell, "git sta", 7, &config);
+        let subs = kinds_of(&candidates, CandidateKind::Subcommand);
+        assert!(subs.contains(&"status"));
+        assert!(!subs.contains(&"log"), "log 不该匹配前缀 sta");
+
+        // 子命令要排在路径候选前面：输入 `git s` 想要的是 status，
+        // 不是当前目录里恰好以 s 开头的文件
+        let candidates = complete(&mut shell, "git s", 5, &config);
+        let first_sub = candidates
+            .iter()
+            .position(|c| c.kind == CandidateKind::Subcommand);
+        let first_path = candidates
+            .iter()
+            .position(|c| matches!(c.kind, CandidateKind::File | CandidateKind::Directory));
+        if let (Some(sub), Some(path)) = (first_sub, first_path) {
+            assert!(sub < path, "子命令应排在路径候选之前");
+        }
+    }
+
+    #[test]
+    fn suggests_second_level_subcommands() {
+        let mut shell = Shell::new(Config::default(), false);
+        let config = Config::default();
+
+        let candidates = complete(&mut shell, "git remote ", 11, &config);
+        let subs = kinds_of(&candidates, CandidateKind::Subcommand);
+        assert!(subs.contains(&"add"), "git remote 应给出 add：{subs:?}");
+        assert!(subs.contains(&"prune"));
+
+        // 二级命令后面不该再把一级子命令列一遍
+        let candidates = complete(&mut shell, "git status ", 11, &config);
+        let subs = kinds_of(&candidates, CandidateKind::Subcommand);
+        assert!(subs.is_empty(), "git status 之后不该有子命令：{subs:?}");
+    }
+
+    /// 配置里的同名项要盖掉内置说明，否则用户改不动内置文案。
+    #[test]
+    fn config_completions_override_builtin_description() {
+        let mut shell = Shell::new(Config::default(), false);
+        let config = Config::parse_str(
+            r#"
+[completions.git]
+status = "my own wording"
+sync = "custom helper"
+
+[completions."git remote"]
+mine = "team script"
+"#,
+        )
+        .expect("解析失败");
+
+        let candidates = complete(&mut shell, "git ", 4, &config);
+        let status = candidates
+            .iter()
+            .find(|c| c.value == "status" && c.kind == CandidateKind::Subcommand)
+            .expect("status 候选存在");
+        assert_eq!(status.description, "my own wording");
+
+        // 配置还能新增内置表里没有的项
+        let subs = kinds_of(&candidates, CandidateKind::Subcommand);
+        assert!(subs.contains(&"sync"));
+
+        // 带空格的命令链要能用引号键配置
+        let candidates = complete(&mut shell, "git remote ", 11, &config);
+        let subs = kinds_of(&candidates, CandidateKind::Subcommand);
+        assert!(subs.contains(&"mine"), "引号键配置未生效：{subs:?}");
+    }
+
+    #[test]
+    fn completes_package_scripts_and_make_targets() {
+        let sandbox = std::env::temp_dir().join(format!(
+            "cmds-projscripts-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::remove_dir_all(&sandbox).ok();
+        std::fs::create_dir_all(&sandbox).unwrap();
+        std::fs::write(
+            sandbox.join("package.json"),
+            br#"{"scripts": {"dev": "vite", "build": "vite build"}}"#,
+        )
+        .unwrap();
+        std::fs::write(sandbox.join("Makefile"), b"release: ## ship it\n\ttrue\n").unwrap();
+
+        let mut shell = Shell::new(Config::default(), false);
+        shell.cwd = sandbox.clone();
+        let config = Config::default();
+
+        let candidates = complete(&mut shell, "npm run ", 8, &config);
+        let scripts = kinds_of(&candidates, CandidateKind::Script);
+        assert!(scripts.contains(&"dev"), "npm run 应补出 dev：{scripts:?}");
+        assert!(scripts.contains(&"build"));
+
+        // pnpm 可以省掉 run
+        let candidates = complete(&mut shell, "pnpm ", 5, &config);
+        let scripts = kinds_of(&candidates, CandidateKind::Script);
+        assert!(scripts.contains(&"dev"));
+
+        let candidates = complete(&mut shell, "make ", 5, &config);
+        let targets = candidates
+            .iter()
+            .find(|c| c.value == "release" && c.kind == CandidateKind::Script)
+            .expect("make target 候选存在");
+        assert_eq!(targets.description, "ship it", "应该用 ## 后的自文档注释");
+
+        std::fs::remove_dir_all(&sandbox).ok();
+    }
+
+    /// 预置脚本按整行召回，所以不必记住缩写——敲命令本身也能找到。
+    #[test]
+    fn recalls_preset_scripts_by_name_or_command() {
+        let mut shell = Shell::new(Config::default(), false);
+        let config = Config::parse_str(
+            r#"
+[scripts]
+gst = "git status --short --branch"
+"#,
+        )
+        .expect("解析失败");
+
+        // 按缩写找
+        let candidates = complete(&mut shell, "gst", 3, &config);
+        let script = candidates
+            .iter()
+            .find(|c| c.kind == CandidateKind::Script)
+            .expect("应召回预置脚本");
+        assert_eq!(script.value, "git status --short --branch");
+        assert_eq!(script.replace, 0..3, "预置脚本要替换整行");
+
+        // 直接敲命令前缀也能找到
+        let candidates = complete(&mut shell, "git stat", 8, &config);
+        assert!(
+            candidates.iter().any(
+                |c| c.kind == CandidateKind::Script && c.value == "git status --short --branch"
+            ),
+            "按命令前缀也该召回预置脚本"
         );
     }
 

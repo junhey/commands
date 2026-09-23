@@ -49,6 +49,25 @@ pub fn render(ctx: &Context<'_>) -> Prompt {
     }
 }
 
+/// `$all` 展开成的模块链——提示符第一行的「信息区」。
+///
+/// 存在的理由：配置文件里如果写死了完整的模块列表，升级后新增的模块永远不会
+/// 出现（旧配置会盖掉新默认值）。把 `format = "$all$line_break$character"`
+/// 写进模板，用户就能自动跟上后续版本新加的模块。
+///
+/// 默认关闭的模块（os / package / shlvl / git_commit / time）也列在这里：
+/// 它们靠自己的 `enabled` 控制显隐，摆进来才能做到「改一个 enabled 就看得见」，
+/// 而不是改完配置发现还得先搞懂占位符叫什么、该插在哪。
+///
+/// `character` / `container` / `shlvl` 不在这里：它们属于第二行，贴着光标。
+/// `identity` 也不在——它是 `$username$hostname` 的紧凑替代，同时出现会重复。
+pub const ALL_MODULES: &str = concat!(
+    "$os$username$hostname$dir",
+    "$git_branch$git_commit$git_state$git_status",
+    "$venv$languages$package",
+    "$jobs$cmd_duration$time$status",
+);
+
 /// 解析 `$module` / `${module}` 占位符。
 pub fn render_format(format: &str, ctx: &Context<'_>) -> String {
     let chars: Vec<char> = format.chars().collect();
@@ -78,6 +97,10 @@ pub fn render_format(format: &str, ctx: &Context<'_>) -> String {
                 }
                 if name.is_empty() {
                     out.push('$');
+                    continue;
+                }
+                if name == "all" {
+                    out.push_str(&render_format(ALL_MODULES, ctx));
                     continue;
                 }
                 if let Some(rendered) = modules::render_module(&name, ctx) {
@@ -203,6 +226,62 @@ mod tests {
         });
         assert_eq!(prompt.leading, "first\n");
         assert!(prompt.last_line.contains('❯'));
+    }
+
+    /// `$all` 必须真的展开成模块，而不是被当作未知占位符吃掉。
+    #[test]
+    fn expands_all_placeholder() {
+        style::set_color_enabled(false);
+        let mut config = ctx_config("$all$character");
+        config.identity.show_user = crate::config::Visibility::Always;
+        let env: util::EnvMap = [("USER".to_string(), "root".to_string())]
+            .into_iter()
+            .collect();
+        let cwd = PathBuf::from(".");
+        let prompt = render(&Context {
+            config: &config,
+            cwd: &cwd,
+            status: 0,
+            duration_ms: 0,
+            jobs: 0,
+            env: &env,
+        });
+        assert!(
+            prompt.last_line.contains("root in "),
+            "$all 应该展开出 username 模块，实际：{:?}",
+            prompt.last_line
+        );
+    }
+
+    /// 默认 format 必须用 `$all` 而不是写死模块列表——写死的话，
+    /// 以后新增的模块对着老配置永远不会出现。
+    #[test]
+    fn default_format_uses_all_placeholder() {
+        let config = Config::default();
+        assert!(
+            config.format.contains("$all"),
+            "默认 format 应该用 $all：{}",
+            config.format
+        );
+    }
+
+    /// 实现了模块却忘了接进提示符，是很容易犯又很难发现的漏洞（功能在，但看不见）。
+    #[test]
+    fn every_module_is_reachable() {
+        let config = Config::default();
+        let reachable = format!("{ALL_MODULES}{}", config.format);
+        // identity 是 $username$hostname 的紧凑替代，两者同时出现会重复显示，
+        // 所以它是唯一刻意不进默认 format 的模块。
+        const OPT_IN_ONLY: &[&str] = &["identity"];
+        for name in modules::MODULE_NAMES {
+            if OPT_IN_ONLY.contains(name) {
+                continue;
+            }
+            assert!(
+                reachable.contains(&format!("${name}")),
+                "模块 {name} 没有接进默认 format 或 $all"
+            );
+        }
     }
 
     #[test]

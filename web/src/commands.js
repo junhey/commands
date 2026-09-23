@@ -23,7 +23,7 @@ export const BRAND = {
   repoUrl: "https://github.com/junhey/commands",
   // 单元测试数。页面和 README 都在宣传这个数字，散着写迟早对不上，
   // 所以只留这一处；CI 的 docs job 会拿 `cargo test` 的真实结果校验它。
-  tests: 109,
+  tests: 155,
   get tagline() {
     return t("Type less, do more.", "少敲一点，多做一点。");
   },
@@ -436,19 +436,56 @@ export function isKnownCommand(name, extras = {}) {
 
 /* ─────────────────────── 配置模板生成 ─────────────────────── */
 
-/** 三元组是 [占位符, 英文标签, 中文标签]。i18n-pairs-begin */
+/**
+ * 三元组是 [占位符, 英文标签, 中文标签]。
+ * 顺序要和 CLI 的 `prompt::ALL_MODULES` 保持一致，勾选生成的 format 才和
+ * 默认提示符长得一样。i18n-pairs-begin
+ */
 export const promptModules = [
+  ["$os", "OS icon", "系统图标"],
+  ["$username", "User name (root / SSH / container)", "用户名（root / SSH / 容器）"],
+  ["$hostname", "Host name", "主机名"],
   ["$dir", "Current directory", "当前目录"],
   ["$git_branch", "Git branch", "Git 分支"],
+  ["$git_commit", "Short commit hash", "短 commit hash"],
+  ["$git_state", "Rebase / merge in progress", "rebase / merge 进行中"],
   ["$git_status", "Git status", "Git 状态"],
+  ["$venv", "Python virtualenv", "Python 虚拟环境"],
   ["$languages", "Languages and versions", "语言与版本"],
+  ["$package", "Project version", "项目版本号"],
+  ["$jobs", "Background jobs", "后台任务数"],
   ["$cmd_duration", "Last command duration", "上条命令耗时"],
+  ["$time", "Clock", "当前时间"],
   ["$status", "Last exit code", "上条命令退出码"],
+  ["$container", "Container badge ⬢ [Docker]", "容器标识 ⬢ [Docker]"],
+  ["$shlvl", "Shell nesting depth", "shell 嵌套层级"],
   ["$character", "Prompt character ❯", "提示符号 ❯"],
   // i18n-pairs-end
 ];
 
 const MODULE_ORDER = promptModules.map(([id]) => id);
+
+/**
+ * 这些模块画在第二行，贴着光标——和 CLI 默认 format 一致
+ * （`$all$line_break$container$shlvl$character`）。
+ */
+const SECOND_LINE_MODULES = ["$container", "$shlvl"];
+
+/** 默认开启的模块：对应 CLI 装完就能看到的那套，可选模块不默认勾。 */
+export const defaultPromptModules = [
+  "$username",
+  "$hostname",
+  "$dir",
+  "$git_branch",
+  "$git_state",
+  "$git_status",
+  "$venv",
+  "$languages",
+  "$cmd_duration",
+  "$status",
+  "$container",
+  "$character",
+];
 
 /**
  * 依据网站上的选择生成 `~/.config/cmds/config.toml`，可直接复制到本地使用。
@@ -467,10 +504,15 @@ export function buildConfigToml(options = {}) {
 
   const ordered = MODULE_ORDER.filter((module) => modules.includes(module));
   const hasCharacter = ordered.includes("$character");
-  const body = ordered.filter((module) => module !== "$character");
-  const format =
-    body.join("") +
-    (hasCharacter ? `${lineBreak ? "$line_break" : ""}$character` : "");
+  // 第一行是信息区，container / shlvl 和提示符号一起放第二行。
+  const first = ordered.filter(
+    (module) => module !== "$character" && !SECOND_LINE_MODULES.includes(module),
+  );
+  const second = ordered.filter((module) => SECOND_LINE_MODULES.includes(module));
+  const tail = second.join("");
+  const format = hasCharacter
+    ? `${first.join("")}${lineBreak ? "$line_break" : ""}${tail}$character`
+    : `${first.join("")}${tail}`;
 
   const lines = [
     `# ${BRAND.name} (${BRAND.bin}) ${t(
@@ -482,6 +524,10 @@ export function buildConfigToml(options = {}) {
       `# 保存到 ~/.config/${BRAND.bin}/config.toml，或用 \`${BRAND.bin} config init\` 生成默认模板`,
     ),
     "",
+    t(
+      "# Prefer $all here to pick up modules added in later versions automatically",
+      "# 想自动获得后续版本新增的模块，把下面这行的模块列表换成 $all",
+    ),
     `format = "${format || "$character"}"`,
     `add_newline = ${addNewline}`,
     "",
